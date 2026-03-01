@@ -19,6 +19,8 @@ lri = '\u2066'
 rli = '\u2067'
 pdi = '\u2069'
 
+MAX_ITEMS = 10
+
 # Parse arguments
 parser = argparse.ArgumentParser(description='Hebrew news reader')
 parser.add_argument('-p', '--poll', action='store_true',
@@ -142,7 +144,7 @@ def fetch_ynet():
         times = doc.xpath('//time[contains(@class, "DateDisplay")]')
 
         items = []
-        for t, tm in zip(titles, times):
+        for t, tm in zip(titles[:MAX_ITEMS], times[:MAX_ITEMS]):
             title_text = "".join(t.itertext()).strip()
             dt_str = tm.get("datetime")
             if dt_str:
@@ -195,8 +197,6 @@ def show_news(news_items):
     if not news_items:
         return
 
-    log_debug(f"Seen set size: {len(seen)}")
-
     items = []
     for i, (title_text, dt_str, src) in enumerate(news_items):
         if source_filter and source_filter not in src:
@@ -211,15 +211,8 @@ def show_news(news_items):
             if title_text not in seen:
                 seen.append(title_text)
                 items.insert(0, (title_text, parse_time(dt_str), src))
-                if not poll_mode and len(items) >= 10:
+                if not poll_mode and len(items) >= MAX_ITEMS:
                     break
-                if poll_mode and len(items) >= 1:
-                    break
-
-    if poll_mode and first_poll:
-        log_debug(f"First poll: marked {len(seen)} items as seen")
-
-    log_debug(f"Collected {len(items)} items to display")
 
     for title, ts, src in items:
         print_item(title, ts, src)

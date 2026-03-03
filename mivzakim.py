@@ -37,7 +37,7 @@ poll_mode = args.poll
 debug = args.debug
 use_ynet = args.ynet
 source_filter = args.source
-seen = deque(maxlen=20)
+seen = deque(maxlen=10*MAX_ITEMS)
 first_poll = True
 last_spoken = None
 

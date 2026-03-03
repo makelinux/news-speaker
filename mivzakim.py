@@ -64,22 +64,15 @@ debug = args.debug
 use_ynet = args.ynet
 source_filter = args.source
 
-# Get URL from args or config
+# Get sources from args or config
 if args.url:
-    rss_url = args.url
-    current_source = {'use_description': args.use_description}
+    enabled_sources = [{'url': args.url, 'name': '', 'use_description': args.use_description}]
 else:
     sources = config.get('sources', [])
-    enabled = [s for s in sources if s.get('enabled', True)]
-    if enabled:
-        current_source = enabled[0]
-        rss_url = current_source['url']
-    else:
-        rss_url = 'https://rss.mivzakim.net/rss/category/1'
-        current_source = {'use_description': False}
+    enabled_sources = [s for s in sources if s.get('enabled', True)]
+    if not enabled_sources:
+        enabled_sources = [{'url': 'https://rss.mivzakim.net/rss/category/1', 'name': 'Mivzakim', 'use_description': False}]
 
-# Command-line arg overrides config
-use_description = args.use_description if args.use_description else current_source.get('use_description', True)
 seen = deque(maxlen=10*MAX_ITEMS)
 first_poll = True
 last_spoken = None
@@ -150,40 +143,69 @@ def speak_text(lang, text):
             resume_media()
 
 
-def fetch_rss():
+def fetch_rss(source_config):
     try:
-        response = requests.get(rss_url, timeout=30)
+        url = source_config['url']
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0',
+            'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+        }
+        response = requests.get(url, timeout=30, headers=headers)
         response.raise_for_status()
-        log_debug(f"Fetched {len(response.content)} bytes from RSS")
+        log_debug(f"Fetched {len(response.content)} bytes from {url}")
         parser = etree.XMLParser(recover=True)
         root = etree.fromstring(response.content, parser)
 
+        channel_title_elem = root.find('.//channel/title')
+        if channel_title_elem is None:
+            channel_title_elem = root.find('.//{http://www.w3.org/2005/Atom}title')
+        channel_name = channel_title_elem.text.strip() if channel_title_elem is not None and channel_title_elem.text else source_config.get('name', '')
+
+        use_desc = args.use_description if args.use_description else source_config.get('use_description', True)
+
         items = []
-        for item in root.xpath('//item'):
+        for item in root.xpath('//item | //entry'):
+            if len(items) >= MAX_ITEMS:
+                break
             title = item.find('title')
+            if title is None:
+                title = item.find('.//{http://www.w3.org/2005/Atom}title')
             pubdate = item.find('pubDate')
+            if pubdate is None:
+                pubdate = item.find('.//{http://www.w3.org/2005/Atom}published')
+            if pubdate is None:
+                pubdate = item.find('.//{http://www.w3.org/2005/Atom}updated')
             source = item.find('source')
             description = item.find('description')
+            if description is None:
+                description = item.find('.//{http://www.w3.org/2005/Atom}summary')
             if title is not None and title.text and pubdate is not None and pubdate.text:
                 title_text = title.text.strip()
                 dt_str = pubdate.text.strip()
-                src = source.text.strip().split(' - ')[0] if source is not None and source.text else ''
+                src = source.text.strip().split(' - ')[0] if source is not None and source.text else channel_name
                 desc = description.text.strip() if description is not None and description.text else ''
-                items.append((title_text, dt_str, src, desc))
+                try:
+                    dt = parse_datetime(dt_str)
+                    items.append((dt, title_text, dt_str, src, desc, use_desc))
+                except Exception as e:
+                    log_debug(f"Failed to parse date '{dt_str}': {e}")
 
-        log_debug(f"Found {len(items)} news items from RSS")
+        log_debug(f"Found {len(items)} news items from {url} (limited to {MAX_ITEMS})")
         return items
     except Exception as e:
-        print(f"Error fetching RSS: {e}")
+        print(f"Error fetching RSS from {source_config.get('url', 'unknown')}: {e}", file=sys.stderr)
         return []
 
 
-def fetch_ynet():
+def fetch_ynet(source_config):
     try:
-        response = requests.get('https://www.ynet.co.il/news/category/184',
-                                timeout=30)
+        url = source_config.get('url', 'https://www.ynet.co.il/news/category/184')
+        channel_name = source_config.get('name', 'Ynet')
+        use_desc = args.use_description if args.use_description else source_config.get('use_description', False)
+
+        response = requests.get(url, timeout=30)
         response.raise_for_status()
-        log_debug(f"Fetched {len(response.content)} bytes from Ynet")
+        log_debug(f"Fetched {len(response.content)} bytes from {url}")
         doc = html.fromstring(response.content)
 
         titles = doc.xpath('//div[@class="title"]')
@@ -194,39 +216,63 @@ def fetch_ynet():
             title_text = "".join(t.itertext()).strip()
             dt_str = tm.get("datetime")
             if dt_str:
-                items.append((title_text, dt_str, 'Ynet', ''))
+                try:
+                    dt = parse_datetime(dt_str)
+                    items.append((dt, title_text, dt_str, channel_name, '', use_desc))
+                except Exception as e:
+                    log_debug(f"Failed to parse date '{dt_str}': {e}")
 
-        log_debug(f"Found {len(items)} news items from Ynet")
+        log_debug(f"Found {len(items)} news items from {url} (limited to {MAX_ITEMS})")
         return items
     except requests.RequestException as e:
-        print(f"Error fetching Ynet: {e}")
+        print(f"Error fetching HTML from {source_config.get('url', 'unknown')}: {e}", file=sys.stderr)
         return []
 
 
 def fetch_news():
-    return fetch_ynet() if use_ynet else fetch_rss()
+    if use_ynet:
+        return fetch_ynet({'url': 'https://www.ynet.co.il/news/category/184', 'name': 'Ynet', 'use_description': False})
+
+    all_items = []
+    for source in enabled_sources:
+        if source.get('type') == 'html':
+            items = fetch_ynet(source)
+        else:
+            items = fetch_rss(source)
+        all_items.extend(items)
+
+    # Sort by datetime (newest first)
+    all_items.sort(key=lambda x: x[0], reverse=True)
+    log_debug(f"Total items from all sources: {len(all_items)}")
+
+    return all_items
 
 
-def print_item(title, ts, src, desc=''):
+def print_item(title, ts, src, desc='', use_desc=False):
     """Print news item and optionally speak"""
     global last_spoken
+
+    # Strip trailing text in parentheses
+    import re
+    title = re.sub(r'\s*\([^)]+\)\s*$', '', title)
+
     lang = detect(title)
     if lang == 'he':
         title_rj = title.rjust(110)
         print(f"{rli} {title_rj} {pdi}{lri}- {ts}{pdi}")
-        if desc and use_description:
+        if desc and use_desc:
             wrapped = textwrap.fill(desc, width=100, initial_indent='\t', subsequent_indent='\t')
             print(f"\n{wrapped}")
         print(f"{src}")
     else:
         print(f"{ts} - {title}")
-        if desc and use_description:
+        if desc and use_desc:
             wrapped = textwrap.fill(desc, width=100, initial_indent='\t', subsequent_indent='\t')
             print(f"\n{wrapped}")
         print(f"{src.rjust(110)}")
     sys.stdout.flush()
     if poll_mode: #and not first_poll:
-        text_to_speak = f"{title}. {desc}" if desc and use_description else title
+        text_to_speak = f"{title}. {desc}" if desc and use_desc else title
         text_to_speak = text_to_speak.strip()
         if text_to_speak != last_spoken:
             log_debug(f"Speaking: {text_to_speak[:50]}...")
@@ -236,18 +282,21 @@ def print_item(title, ts, src, desc=''):
             log_debug("Skipping TTS - same as last spoken")
 
 
-def parse_time(dt_str):
-    """Parse datetime string to local time string"""
+def parse_datetime(dt_str):
+    """Parse datetime string to datetime object"""
     try:
         # ISO format (Ynet)
         dt_utc = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-        dt_local = dt_utc.astimezone()
-        return dt_local.strftime('%H:%M')
+        return dt_utc.astimezone()
     except ValueError:
         # RFC 2822 format (RSS)
         from email.utils import parsedate_to_datetime
         dt = parsedate_to_datetime(dt_str)
-        return dt.strftime('%H:%M')
+        return dt.astimezone()
+
+def parse_time(dt_str):
+    """Parse datetime string to local time string"""
+    return parse_datetime(dt_str).strftime('%H:%M')
 
 
 def show_news(news_items):
@@ -257,27 +306,29 @@ def show_news(news_items):
 
     items = []
     for i, item in enumerate(news_items):
-        title_text, dt_str, src = item[0], item[1], item[2]
-        desc = item[3] if len(item) > 3 else ''
+        dt, title_text, dt_str, src = item[0], item[1], item[2], item[3]
+        desc = item[4] if len(item) > 4 else ''
+        use_desc = item[5] if len(item) > 5 else False
         if source_filter and source_filter not in src:
             continue
         if poll_mode and first_poll:
             # Mark all as seen, collect only first item
             seen.append(title_text)
             if i == 0:
-                items.append((title_text, parse_time(dt_str), src, desc))
+                items.append((title_text, parse_time(dt_str), src, desc, use_desc))
         else:
             # Normal mode or subsequent polls
             if title_text not in seen:
                 seen.append(title_text)
-                items.insert(0, (title_text, parse_time(dt_str), src, desc))
+                items.insert(0, (title_text, parse_time(dt_str), src, desc, use_desc))
                 if not poll_mode and len(items) >= MAX_ITEMS:
                     break
 
     for item in items:
         title, ts, src = item[0], item[1], item[2]
         desc = item[3] if len(item) > 3 else ''
-        print_item(title, ts, src, desc)
+        use_desc = item[4] if len(item) > 4 else False
+        print_item(title, ts, src, desc, use_desc)
 
     first_poll = False
 

@@ -1,7 +1,11 @@
 sources:
+  - url: https://www.techmeme.com/feed.xml
+    use_description: false
+    #enabled: false
   - name: Mivzakim
     url: https://rss.mivzakim.net/rss/category/1
     use_description: false
+    enabled: false
   - name: Wirted
     url: https://www.wired.com/feed/tag/ai/latest/rss
     enabled: false
@@ -9,6 +13,30 @@ sources:
     url: https://www.ynet.co.il/news/category/184
     type: html
     enabled: false
+  - name: The Decoder
+    url: https://the-decoder.com/feed/
+    use_description: false
+  - name: Guardian AI
+    url: https://www.theguardian.com/technology/artificialintelligenceai/rss
+    use_description: false
+  - name: The Next Web Neural
+    url: https://thenextweb.com/neural/feed
+    use_description: false
+  - name: HackerNoon AI
+    url: https://hackernoon.com/tagged/ai/feed
+    use_description: false
+  - name: SiliconAngle AI
+    url: https://siliconangle.com/category/ai/feed
+    use_description: false
+  - name: Futurism AI
+    url: https://futurism.com/categories/ai-artificial-intelligence/feed
+    use_description: false
+  - name: Phys.org ML
+    url: https://phys.org/rss-feed/technology-news/machine-learning-ai/
+    use_description: false
+  - name: The New Stack
+    url: https://thenewstack.io/feed
+    use_description: false
 
 settings:
   max_items: 10

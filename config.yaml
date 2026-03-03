@@ -1,0 +1,16 @@
+sources:
+  - name: Mivzakim
+    url: https://rss.mivzakim.net/rss/category/1
+    use_description: false
+  - name: Wirted
+    url: https://www.wired.com/feed/tag/ai/latest/rss
+    enabled: false
+  - name: Ynet
+    url: https://www.ynet.co.il/news/category/184
+    type: html
+    enabled: false
+
+settings:
+  max_items: 10
+  poll_interval: 60
+  tts_volume_adjust: -10

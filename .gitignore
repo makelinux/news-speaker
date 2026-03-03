@@ -19,3 +19,6 @@ venv/
 # Temp files
 old
 *.tmp
+
+# User config
+config.local.yaml

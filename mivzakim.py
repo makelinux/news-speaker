@@ -5,6 +5,7 @@ import os
 import time
 import argparse
 import subprocess
+import textwrap
 from datetime import datetime
 from io import BytesIO
 from collections import deque
@@ -15,12 +16,22 @@ from gtts import gTTS
 from pydub import AudioSegment
 import pasimple
 from langdetect import detect
+import yaml
 
 lri = '\u2066'
 rli = '\u2067'
 pdi = '\u2069'
 
-MAX_ITEMS = 10
+# Load config
+config = {}
+config_file = os.path.join(os.path.dirname(__file__), 'config.yaml')
+if os.path.exists(config_file):
+    with open(config_file) as f:
+        config = yaml.safe_load(f) or {}
+
+MAX_ITEMS = config.get('settings', {}).get('max_items', 10)
+POLL_INTERVAL = config.get('settings', {}).get('poll_interval', 60)
+TTS_VOLUME_ADJUST = config.get('settings', {}).get('tts_volume_adjust', -10)
 
 # Parse arguments
 parser = argparse.ArgumentParser(description='Hebrew news reader')
@@ -34,13 +45,41 @@ parser.add_argument('-s', '--source', type=str,
                     help='Filter by source name (e.g., "Ynet", "N12")')
 parser.add_argument('-u', '--url', type=str,
                     help='Custom RSS URL')
+parser.add_argument('-c', '--config', type=str,
+                    help='Path to config file (default: ./config.yaml)')
+parser.add_argument('-D', '--use-description', action='store_true',
+                    help='Include description field in display and TTS')
 args = parser.parse_args()
+
+# Reload config if custom path specified
+if args.config:
+    with open(args.config) as f:
+        config = yaml.safe_load(f) or {}
+    MAX_ITEMS = config.get('settings', {}).get('max_items', 10)
+    POLL_INTERVAL = config.get('settings', {}).get('poll_interval', 60)
+    TTS_VOLUME_ADJUST = config.get('settings', {}).get('tts_volume_adjust', -10)
 
 poll_mode = args.poll
 debug = args.debug
 use_ynet = args.ynet
 source_filter = args.source
-rss_url = args.url or 'https://rss.mivzakim.net/rss/category/1'
+
+# Get URL from args or config
+if args.url:
+    rss_url = args.url
+    current_source = {'use_description': args.use_description}
+else:
+    sources = config.get('sources', [])
+    enabled = [s for s in sources if s.get('enabled', True)]
+    if enabled:
+        current_source = enabled[0]
+        rss_url = current_source['url']
+    else:
+        rss_url = 'https://rss.mivzakim.net/rss/category/1'
+        current_source = {'use_description': False}
+
+# Command-line arg overrides config
+use_description = args.use_description if args.use_description else current_source.get('use_description', True)
 seen = deque(maxlen=10*MAX_ITEMS)
 first_poll = True
 last_spoken = None
@@ -77,13 +116,12 @@ def resume_media():
         pass
 
 
-def speak_text(text):
+def speak_text(lang, text):
     """Speak text using gTTS"""
     was_playing = pause_media()
     if was_playing:
         time.sleep(0.5)
     try:
-        lang = detect(text)
         if lang == 'he':
             lang = 'iw'
         log_debug(f"TTS: {text[:50]}... (lang: {lang})")
@@ -92,7 +130,7 @@ def speak_text(text):
         tts.write_to_fp(buf)
         buf.seek(0)
         audio = AudioSegment.from_mp3(buf)
-        audio -= 10
+        audio += TTS_VOLUME_ADJUST
         with pasimple.PaSimple(
             pasimple.PA_STREAM_PLAYBACK,
             pasimple.PA_SAMPLE_S16LE,
@@ -125,11 +163,13 @@ def fetch_rss():
             title = item.find('title')
             pubdate = item.find('pubDate')
             source = item.find('source')
+            description = item.find('description')
             if title is not None and title.text and pubdate is not None and pubdate.text:
                 title_text = title.text.strip()
                 dt_str = pubdate.text.strip()
-                src = source.text.strip().split(' - ')[0] if source is not None and source.text else 'RSS'
-                items.append((title_text, dt_str, src))
+                src = source.text.strip().split(' - ')[0] if source is not None and source.text else ''
+                desc = description.text.strip() if description is not None and description.text else ''
+                items.append((title_text, dt_str, src, desc))
 
         log_debug(f"Found {len(items)} news items from RSS")
         return items
@@ -154,7 +194,7 @@ def fetch_ynet():
             title_text = "".join(t.itertext()).strip()
             dt_str = tm.get("datetime")
             if dt_str:
-                items.append((title_text, dt_str, 'Ynet'))
+                items.append((title_text, dt_str, 'Ynet', ''))
 
         log_debug(f"Found {len(items)} news items from Ynet")
         return items
@@ -167,19 +207,31 @@ def fetch_news():
     return fetch_ynet() if use_ynet else fetch_rss()
 
 
-def print_item(title, ts, src):
+def print_item(title, ts, src, desc=''):
     """Print news item and optionally speak"""
     global last_spoken
-    title_rj = title.rjust(110)
-    print(f"{rli} {title_rj} {pdi}{lri} - {ts}{pdi}")
-    print(f"{src}")
+    lang = detect(title)
+    if lang == 'he':
+        title_rj = title.rjust(110)
+        print(f"{rli} {title_rj} {pdi}{lri}- {ts}{pdi}")
+        if desc and use_description:
+            wrapped = textwrap.fill(desc, width=100, initial_indent='\t', subsequent_indent='\t')
+            print(f"\n{wrapped}")
+        print(f"{src}")
+    else:
+        print(f"{ts} - {title}")
+        if desc and use_description:
+            wrapped = textwrap.fill(desc, width=100, initial_indent='\t', subsequent_indent='\t')
+            print(f"\n{wrapped}")
+        print(f"{src.rjust(110)}")
     sys.stdout.flush()
     if poll_mode: #and not first_poll:
-        title_stripped = title.strip()
-        if title_stripped != last_spoken:
-            log_debug(f"Speaking: {title_stripped[:30]}...")
-            speak_text(title_stripped)
-            last_spoken = title_stripped
+        text_to_speak = f"{title}. {desc}" if desc and use_description else title
+        text_to_speak = text_to_speak.strip()
+        if text_to_speak != last_spoken:
+            log_debug(f"Speaking: {text_to_speak[:50]}...")
+            speak_text(lang, text_to_speak)
+            last_spoken = text_to_speak
         else:
             log_debug("Skipping TTS - same as last spoken")
 
@@ -204,24 +256,28 @@ def show_news(news_items):
         return
 
     items = []
-    for i, (title_text, dt_str, src) in enumerate(news_items):
+    for i, item in enumerate(news_items):
+        title_text, dt_str, src = item[0], item[1], item[2]
+        desc = item[3] if len(item) > 3 else ''
         if source_filter and source_filter not in src:
             continue
         if poll_mode and first_poll:
             # Mark all as seen, collect only first item
             seen.append(title_text)
             if i == 0:
-                items.append((title_text, parse_time(dt_str), src))
+                items.append((title_text, parse_time(dt_str), src, desc))
         else:
             # Normal mode or subsequent polls
             if title_text not in seen:
                 seen.append(title_text)
-                items.insert(0, (title_text, parse_time(dt_str), src))
+                items.insert(0, (title_text, parse_time(dt_str), src, desc))
                 if not poll_mode and len(items) >= MAX_ITEMS:
                     break
 
-    for title, ts, src in items:
-        print_item(title, ts, src)
+    for item in items:
+        title, ts, src = item[0], item[1], item[2]
+        desc = item[3] if len(item) > 3 else ''
+        print_item(title, ts, src, desc)
 
     first_poll = False
 
@@ -232,8 +288,8 @@ if poll_mode:
         # log_debug("=== Poll cycle start ===")
         news = fetch_news()
         show_news(news)
-        # log_debug("Sleeping 60 seconds...")
-        time.sleep(60)
+        # log_debug(f"Sleeping {POLL_INTERVAL} seconds...")
+        time.sleep(POLL_INTERVAL)
 else:
     log_debug("Running in normal mode")
     os.system('clear')

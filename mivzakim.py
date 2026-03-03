@@ -31,12 +31,15 @@ parser.add_argument('-y', '--ynet', action='store_true',
                     help='Use Ynet HTML source instead of RSS')
 parser.add_argument('-s', '--source', type=str,
                     help='Filter by source name (e.g., "Ynet", "N12")')
+parser.add_argument('-u', '--url', type=str,
+                    help='Custom RSS URL')
 args = parser.parse_args()
 
 poll_mode = args.poll
 debug = args.debug
 use_ynet = args.ynet
 source_filter = args.source
+rss_url = args.url or 'https://rss.mivzakim.net/rss/category/1'
 seen = deque(maxlen=10*MAX_ITEMS)
 first_poll = True
 last_spoken = None
@@ -107,8 +110,7 @@ def speak_text(text):
 
 def fetch_rss():
     try:
-        response = requests.get('https://rss.mivzakim.net/rss/category/1',
-                                timeout=30)
+        response = requests.get(rss_url, timeout=30)
         response.raise_for_status()
         log_debug(f"Fetched {len(response.content)} bytes from RSS")
         parser = etree.XMLParser(recover=True)

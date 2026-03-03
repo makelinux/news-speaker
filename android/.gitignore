@@ -1,0 +1,14 @@
+.gradle/
+build/
+gradle.zip
+gradle-8.2/
+local.properties
+*.apk
+*.ap_
+*.dex
+*.class
+*.log
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/

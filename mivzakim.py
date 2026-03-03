@@ -14,6 +14,7 @@ import requests
 from gtts import gTTS
 from pydub import AudioSegment
 import pasimple
+from langdetect import detect
 
 lri = '\u2066'
 rli = '\u2067'
@@ -82,8 +83,11 @@ def speak_text(text):
     if was_playing:
         time.sleep(0.5)
     try:
-        log_debug(f"TTS: {text[:50]}...")
-        tts = gTTS(text, lang='iw')
+        lang = detect(text)
+        if lang == 'he':
+            lang = 'iw'
+        log_debug(f"TTS: {text[:50]}... (lang: {lang})")
+        tts = gTTS(text, lang=lang)
         buf = BytesIO()
         tts.write_to_fp(buf)
         buf.seek(0)

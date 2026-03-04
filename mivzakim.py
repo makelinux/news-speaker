@@ -144,96 +144,119 @@ def speak_text(lang, text):
 
 
 def fetch_rss(source_config):
-    try:
-        url = source_config['url']
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0',
-            'Accept': 'application/rss+xml, application/xml, text/xml, */*'
-        }
-        response = requests.get(url, timeout=30, headers=headers)
-        response.raise_for_status()
-        log_debug(f"Fetched {len(response.content)} bytes from {url}")
-        parser = etree.XMLParser(recover=True)
-        root = etree.fromstring(response.content, parser)
+    url = source_config['url']
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+    }
 
-        channel_title_elem = root.find('.//channel/title')
-        if channel_title_elem is None:
-            channel_title_elem = root.find('.//{http://www.w3.org/2005/Atom}title')
-        channel_name = channel_title_elem.text.strip() if channel_title_elem is not None and channel_title_elem.text else source_config.get('name', '')
+    # Retry up to 3 times on failure
+    root = None
+    for attempt in range(3):
+        try:
+            response = requests.get(url, timeout=30, headers=headers)
+            response.raise_for_status()
+            log_debug(f"Fetched {len(response.content)} bytes from {url}")
+            parser = etree.XMLParser(recover=True)
+            root = etree.fromstring(response.content, parser)
+            break
+        except Exception as e:
+            if attempt < 2:
+                log_debug(f"Attempt {attempt + 1} failed for {url}: {e}, retrying...")
+                time.sleep(1)
+            else:
+                print(f"Error fetching RSS from {url}: {e}", file=sys.stderr)
+                return []
 
-        use_desc = args.use_description if args.use_description else source_config.get('use_description', True)
-        src_filter = source_config.get('source_filter')
-
-        items = []
-        for item in root.xpath('//item | //entry'):
-            if len(items) >= MAX_ITEMS:
-                break
-            title = item.find('title')
-            if title is None:
-                title = item.find('.//{http://www.w3.org/2005/Atom}title')
-            pubdate = item.find('pubDate')
-            if pubdate is None:
-                pubdate = item.find('.//{http://www.w3.org/2005/Atom}published')
-            if pubdate is None:
-                pubdate = item.find('.//{http://www.w3.org/2005/Atom}updated')
-            source = item.find('source')
-            description = item.find('description')
-            if description is None:
-                description = item.find('.//{http://www.w3.org/2005/Atom}summary')
-            if title is not None and title.text and pubdate is not None and pubdate.text:
-                title_text = title.text.strip()
-                dt_str = pubdate.text.strip()
-                src = source.text.strip().split(' - ')[0] if source is not None and source.text else channel_name
-                desc = description.text.strip() if description is not None and description.text else ''
-
-                # Apply source filter if configured
-                if src_filter and src_filter not in src:
-                    continue
-
-                try:
-                    dt = parse_datetime(dt_str)
-                    items.append((dt, title_text, dt_str, src, desc, use_desc))
-                except Exception as e:
-                    log_debug(f"Failed to parse date '{dt_str}': {e}")
-
-        log_debug(f"Found {len(items)} news items from {url} (limited to {MAX_ITEMS})")
-        return items
-    except Exception as e:
-        print(f"Error fetching RSS from {source_config.get('url', 'unknown')}: {e}", file=sys.stderr)
+    if root is None:
         return []
+
+    channel_title_elem = root.find('.//channel/title')
+    if channel_title_elem is None:
+        channel_title_elem = root.find('.//{http://www.w3.org/2005/Atom}title')
+    channel_name = channel_title_elem.text.strip() if channel_title_elem is not None and channel_title_elem.text else source_config.get('name', '')
+
+    use_desc = args.use_description if args.use_description else source_config.get('use_description', True)
+    src_filter = source_config.get('source_filter')
+
+    items = []
+    for item in root.xpath('//item | //entry'):
+        if len(items) >= MAX_ITEMS:
+            break
+        title = item.find('title')
+        if title is None:
+            title = item.find('.//{http://www.w3.org/2005/Atom}title')
+        pubdate = item.find('pubDate')
+        if pubdate is None:
+            pubdate = item.find('.//{http://www.w3.org/2005/Atom}published')
+        if pubdate is None:
+            pubdate = item.find('.//{http://www.w3.org/2005/Atom}updated')
+        source = item.find('source')
+        description = item.find('description')
+        if description is None:
+            description = item.find('.//{http://www.w3.org/2005/Atom}summary')
+        if title is not None and title.text and pubdate is not None and pubdate.text:
+            title_text = title.text.strip()
+            dt_str = pubdate.text.strip()
+            src = source.text.strip().split(' - ')[0] if source is not None and source.text else channel_name
+            desc = description.text.strip() if description is not None and description.text else ''
+
+            # Apply source filter if configured
+            if src_filter and src_filter not in src:
+                continue
+
+            try:
+                dt = parse_datetime(dt_str)
+                items.append((dt, title_text, dt_str, src, desc, use_desc))
+            except Exception as e:
+                log_debug(f"Failed to parse date '{dt_str}': {e}")
+
+    log_debug(f"Found {len(items)} news items from {url} (limited to {MAX_ITEMS})")
+    return items
 
 
 def fetch_ynet(source_config):
-    try:
-        url = source_config.get('url', 'https://www.ynet.co.il/news/category/184')
-        channel_name = source_config.get('name', 'Ynet')
-        use_desc = args.use_description if args.use_description else source_config.get('use_description', False)
-        src_filter = source_config.get('source_filter')
+    url = source_config.get('url', 'https://www.ynet.co.il/news/category/184')
+    channel_name = source_config.get('name', 'Ynet')
+    use_desc = args.use_description if args.use_description else source_config.get('use_description', False)
+    src_filter = source_config.get('source_filter')
 
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        log_debug(f"Fetched {len(response.content)} bytes from {url}")
-        doc = html.fromstring(response.content)
+    # Retry up to 3 times on failure
+    doc = None
+    for attempt in range(3):
+        try:
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            log_debug(f"Fetched {len(response.content)} bytes from {url}")
+            doc = html.fromstring(response.content)
+            break
+        except Exception as e:
+            if attempt < 2:
+                log_debug(f"Attempt {attempt + 1} failed for {url}: {e}, retrying...")
+                time.sleep(1)
+            else:
+                print(f"Error fetching HTML from {url}: {e}", file=sys.stderr)
+                return []
 
-        titles = doc.xpath('//div[@class="title"]')
-        times = doc.xpath('//time[contains(@class, "DateDisplay")]')
-
-        items = []
-        for t, tm in zip(titles[:MAX_ITEMS], times[:MAX_ITEMS]):
-            title_text = "".join(t.itertext()).strip()
-            dt_str = tm.get("datetime")
-            if dt_str:
-                try:
-                    dt = parse_datetime(dt_str)
-                    items.append((dt, title_text, dt_str, channel_name, '', use_desc))
-                except Exception as e:
-                    log_debug(f"Failed to parse date '{dt_str}': {e}")
-
-        log_debug(f"Found {len(items)} news items from {url} (limited to {MAX_ITEMS})")
-        return items
-    except requests.RequestException as e:
-        print(f"Error fetching HTML from {source_config.get('url', 'unknown')}: {e}", file=sys.stderr)
+    if doc is None:
         return []
+
+    titles = doc.xpath('//div[@class="title"]')
+    times = doc.xpath('//time[contains(@class, "DateDisplay")]')
+
+    items = []
+    for t, tm in zip(titles[:MAX_ITEMS], times[:MAX_ITEMS]):
+        title_text = "".join(t.itertext()).strip()
+        dt_str = tm.get("datetime")
+        if dt_str:
+            try:
+                dt = parse_datetime(dt_str)
+                items.append((dt, title_text, dt_str, channel_name, '', use_desc))
+            except Exception as e:
+                log_debug(f"Failed to parse date '{dt_str}': {e}")
+
+    log_debug(f"Found {len(items)} news items from {url} (limited to {MAX_ITEMS})")
+    return items
 
 
 def fetch_news():

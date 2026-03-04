@@ -18,9 +18,9 @@ import pasimple
 from langdetect import detect
 import yaml
 
-lri = '\u2066'
-rli = '\u2067'
-pdi = '\u2069'
+rli = '\u2066'  # Right-to-Left Isolate
+lri = '\u2067'  # Left-to-Right Isolate
+pdi = '\u2069'  # Pop Directional Isolate
 
 # Load config
 config = {}
@@ -258,8 +258,18 @@ def print_item(title, ts, src, desc='', use_desc=False):
 
     lang = detect(title)
     if lang == 'he':
-        title_rj = title.rjust(110)
-        print(f"{rli} {title_rj} {pdi}{lri}- {ts}{pdi}")
+        # Isolate Latin characters for proper RTL rendering
+        def isolate_latin(text):
+            return re.sub(r'([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)', rf'{lri}\1{pdi}', text)
+
+        title_isolated = isolate_latin(title)
+        # Count added isolation marks (2 per Latin sequence) and adjust rjust
+        num_marks = (len(title_isolated) - len(title))
+        title_isolated_rj = title_isolated.rjust(120 + num_marks)
+
+        # RLI wrap with time on right (swapped order: time then dash)
+        print(f"{rli}{title_isolated_rj}{pdi} {lri}{ts} -{pdi}")
+
         if desc and use_desc:
             wrapped = textwrap.fill(desc, width=100, initial_indent='\t', subsequent_indent='\t')
             print(f"\n{wrapped}")

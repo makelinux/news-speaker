@@ -256,6 +256,12 @@ def print_item(title, ts, src, desc='', use_desc=False):
     import re
     title = re.sub(r'\s*\([^)]+\)\s*$', '', title)
 
+    # Strip HTML tags from description
+    if desc:
+        desc = re.sub(r'<[^>]+>', '', desc)
+        desc = re.sub(r'&\w+;', ' ', desc)  # Remove HTML entities
+        desc = ' '.join(desc.split())  # Normalize whitespace
+
     lang = detect(title)
     if lang == 'he':
         # Isolate Latin characters for proper RTL rendering
@@ -265,19 +271,26 @@ def print_item(title, ts, src, desc='', use_desc=False):
         title_isolated = isolate_latin(title)
         # Count added isolation marks (2 per Latin sequence) and adjust rjust
         num_marks = (len(title_isolated) - len(title))
-        title_isolated_rj = title_isolated.rjust(120 + num_marks)
+        title_isolated_rj = title_isolated.rjust(102 + num_marks)
 
         # RLI wrap with time on right (swapped order: time then dash)
         print(f"{rli}{title_isolated_rj}{pdi} {lri}{ts} -{pdi}")
 
         if desc and use_desc:
-            wrapped = textwrap.fill(desc, width=100, initial_indent='\t', subsequent_indent='\t')
+            wrapped = textwrap.fill(desc, width=100, initial_indent=8*' ', subsequent_indent=8*' ')
             print(f"\n{wrapped}")
         print(f"{src}")
     else:
-        print(f"{ts} - {title}")
+        # Wrap long titles
+        title_line = f"{ts} - {title}"
+        if len(title_line) > 100:
+            wrapped_title = textwrap.fill(title_line, width=100, subsequent_indent=8*' ')
+            print(wrapped_title)
+        else:
+            print(title_line)
+
         if desc and use_desc:
-            wrapped = textwrap.fill(desc, width=100, initial_indent='\t', subsequent_indent='\t')
+            wrapped = textwrap.fill(desc, width=100, initial_indent=8*' ', subsequent_indent=8*' ')
             print(f"\n{wrapped}")
         print(f"{src.rjust(110)}")
     sys.stdout.flush()

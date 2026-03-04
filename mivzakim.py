@@ -162,6 +162,7 @@ def fetch_rss(source_config):
         channel_name = channel_title_elem.text.strip() if channel_title_elem is not None and channel_title_elem.text else source_config.get('name', '')
 
         use_desc = args.use_description if args.use_description else source_config.get('use_description', True)
+        src_filter = source_config.get('source_filter')
 
         items = []
         for item in root.xpath('//item | //entry'):
@@ -184,6 +185,11 @@ def fetch_rss(source_config):
                 dt_str = pubdate.text.strip()
                 src = source.text.strip().split(' - ')[0] if source is not None and source.text else channel_name
                 desc = description.text.strip() if description is not None and description.text else ''
+
+                # Apply source filter if configured
+                if src_filter and src_filter not in src:
+                    continue
+
                 try:
                     dt = parse_datetime(dt_str)
                     items.append((dt, title_text, dt_str, src, desc, use_desc))
@@ -202,6 +208,7 @@ def fetch_ynet(source_config):
         url = source_config.get('url', 'https://www.ynet.co.il/news/category/184')
         channel_name = source_config.get('name', 'Ynet')
         use_desc = args.use_description if args.use_description else source_config.get('use_description', False)
+        src_filter = source_config.get('source_filter')
 
         response = requests.get(url, timeout=30)
         response.raise_for_status()

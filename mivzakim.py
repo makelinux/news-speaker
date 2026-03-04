@@ -333,18 +333,22 @@ def show_news(news_items):
     first_poll = False
 
 
-if poll_mode:
-    # log_debug("Starting polling mode")
-    while True:
-        # log_debug("=== Poll cycle start ===")
+try:
+    if poll_mode:
+        # log_debug("Starting polling mode")
+        while True:
+            # log_debug("=== Poll cycle start ===")
+            news = fetch_news()
+            show_news(news)
+            # log_debug(f"Sleeping {POLL_INTERVAL} seconds...")
+            time.sleep(POLL_INTERVAL)
+    else:
+        log_debug("Running in normal mode")
+        os.system('clear')
+        current_time = datetime.now().strftime('%H:%M')
+        print(" " * 80, f"  {current_time}\n")
         news = fetch_news()
         show_news(news)
-        # log_debug(f"Sleeping {POLL_INTERVAL} seconds...")
-        time.sleep(POLL_INTERVAL)
-else:
-    log_debug("Running in normal mode")
-    os.system('clear')
-    current_time = datetime.now().strftime('%H:%M')
-    print(" " * 80, f"  {current_time}\n")
-    news = fetch_news()
-    show_news(news)
+except KeyboardInterrupt:
+    print("\nExiting...", file=sys.stderr)
+    sys.exit(0)

@@ -6,7 +6,7 @@ import time
 import argparse
 import subprocess
 import textwrap
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 from collections import deque
 
@@ -49,6 +49,8 @@ parser.add_argument('-c', '--config', type=str,
                     help='Path to config file (default: ./config.yaml)')
 parser.add_argument('-D', '--use-description', action='store_true',
                     help='Include description field in display and TTS')
+parser.add_argument('--stat', action='store_true',
+                    help='Show mean time statistics for all configured sources')
 args = parser.parse_args()
 
 # Reload config if custom path specified
@@ -352,6 +354,17 @@ def parse_time(dt_str):
     return parse_datetime(dt_str).strftime('%H:%M')
 
 
+def print_mean_time(news_items):
+    """Print mean time between messages in URL mode"""
+    if len(news_items) < 2:
+        return
+    mt = (news_items[0][0] - news_items[-1][0]) / (len(news_items) - 1)
+    s = str(timedelta(seconds=int(mt.total_seconds())))
+    if s.startswith('0:'):
+        s = s[2:]
+    print(f"Mean time between messages: {s}", file=sys.stderr)
+
+
 def show_news(news_items):
     global first_poll
     if not news_items:
@@ -387,11 +400,24 @@ def show_news(news_items):
 
 
 try:
-    if poll_mode:
+    if args.stat:
+        for src in enabled_sources:
+            items = fetch_rss(src) if src.get('type') != 'html' else fetch_ynet(src)
+            if len(items) < 2:
+                continue
+            mt = (items[0][0] - items[-1][0]) / (len(items) - 1)
+            s = str(timedelta(seconds=int(mt.total_seconds())))
+            if s.startswith('0:'):
+                s = s[2:]
+            name = src.get('name', src.get('url', 'Unknown'))
+            print(f"{name}: {s}")
+    elif poll_mode:
         # log_debug("Starting polling mode")
         while True:
             # log_debug("=== Poll cycle start ===")
             news = fetch_news()
+            if args.url and first_poll:
+                print_mean_time(news)
             show_news(news)
             # log_debug(f"Sleeping {POLL_INTERVAL} seconds...")
             time.sleep(POLL_INTERVAL)
@@ -401,6 +427,8 @@ try:
         current_time = datetime.now().strftime('%H:%M')
         print(" " * 80, f"  {current_time}\n")
         news = fetch_news()
+        if args.url:
+            print_mean_time(news)
         show_news(news)
 except KeyboardInterrupt:
     print("\nExiting...", file=sys.stderr)

@@ -22,17 +22,25 @@ rli = '\u2066'  # Right-to-Left Isolate
 lri = '\u2067'  # Left-to-Right Isolate
 pdi = '\u2069'  # Pop Directional Isolate
 
-# Load config
-config = {}
-config_file = os.path.join(os.path.dirname(__file__), 'config.yaml')
-if os.path.exists(config_file):
-    with open(config_file) as f:
-        config = yaml.safe_load(f) or {}
+def load_config(path=None):
+    global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, BLOCK_WORDS
+    if path is None:
+        path = os.path.join(os.path.dirname(__file__), 'config.yaml')
+    if os.path.exists(path):
+        with open(path) as f:
+            config = yaml.safe_load(f) or {}
+    else:
+        config = {}
+    s = config.get('settings', {})
+    MAX_ITEMS = s.get('max_items', 10)
+    POLL_INTERVAL = s.get('poll_interval', 60)
+    TTS_VOLUME_ADJUST = s.get('tts_volume_adjust', -10)
+    BLOCK_WORDS = s.get('block_words', [])
 
-MAX_ITEMS = config.get('settings', {}).get('max_items', 10)
-POLL_INTERVAL = config.get('settings', {}).get('poll_interval', 60)
-TTS_VOLUME_ADJUST = config.get('settings', {}).get('tts_volume_adjust', -10)
-BLOCK_WORDS = config.get('settings', {}).get('block_words', [])
+config = {}
+MAX_ITEMS = POLL_INTERVAL = TTS_VOLUME_ADJUST = 0
+BLOCK_WORDS = []
+load_config()
 
 # Parse arguments
 parser = argparse.ArgumentParser(description='Hebrew news reader')
@@ -54,14 +62,8 @@ parser.add_argument('--stat', action='store_true',
                     help='Show mean time statistics for all configured sources')
 args = parser.parse_args()
 
-# Reload config if custom path specified
 if args.config:
-    with open(args.config) as f:
-        config = yaml.safe_load(f) or {}
-    MAX_ITEMS = config.get('settings', {}).get('max_items', 10)
-    POLL_INTERVAL = config.get('settings', {}).get('poll_interval', 60)
-    TTS_VOLUME_ADJUST = config.get('settings', {}).get('tts_volume_adjust', -10)
-    BLOCK_WORDS = config.get('settings', {}).get('block_words', [])
+    load_config(args.config)
 
 poll_mode = args.poll
 debug = args.debug

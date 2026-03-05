@@ -1,12 +1,16 @@
 sources:
+  - url: https://www.newsru.co.il/il/www/news/big
+    use_description: false
+    block_words:
+      - футбол
   - url: https://www.techmeme.com/feed.xml
     use_description: false
     #enabled: false
   - name: Mivzakim
     url: https://rss.mivzakim.net/rss/category/1
     use_description: false
-    source_filter: null  # Filter by source name (e.g., "N12"), null for all sources
-    enabled: false
+    source_filter: Ynet  # Filter by source name (e.g., "N12"), null for all sources
+    #enabled: false
   - name: Wirted
     url: https://www.wired.com/feed/tag/ai/latest/rss
     enabled: false
@@ -43,3 +47,4 @@ settings:
   max_items: 10
   poll_interval: 60
   tts_volume_adjust: -10
+  block_words: []

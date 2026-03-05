@@ -32,6 +32,7 @@ if os.path.exists(config_file):
 MAX_ITEMS = config.get('settings', {}).get('max_items', 10)
 POLL_INTERVAL = config.get('settings', {}).get('poll_interval', 60)
 TTS_VOLUME_ADJUST = config.get('settings', {}).get('tts_volume_adjust', -10)
+BLOCK_WORDS = config.get('settings', {}).get('block_words', [])
 
 # Parse arguments
 parser = argparse.ArgumentParser(description='Hebrew news reader')
@@ -60,6 +61,7 @@ if args.config:
     MAX_ITEMS = config.get('settings', {}).get('max_items', 10)
     POLL_INTERVAL = config.get('settings', {}).get('poll_interval', 60)
     TTS_VOLUME_ADJUST = config.get('settings', {}).get('tts_volume_adjust', -10)
+    BLOCK_WORDS = config.get('settings', {}).get('block_words', [])
 
 poll_mode = args.poll
 debug = args.debug
@@ -180,6 +182,7 @@ def fetch_rss(source_config):
 
     use_desc = args.use_description if args.use_description else source_config.get('use_description', True)
     src_filter = source_config.get('source_filter')
+    block_words = [w.lower() for w in BLOCK_WORDS + source_config.get('block_words', [])]
 
     items = []
     for item in root.xpath('//item | //entry'):
@@ -207,6 +210,11 @@ def fetch_rss(source_config):
             if src_filter and src_filter not in src:
                 continue
 
+            # Skip items with blocked words in title or description
+            text = f"{title_text} {desc}".lower()
+            if any(word in text for word in block_words):
+                continue
+
             try:
                 dt = parse_datetime(dt_str)
                 items.append((dt, title_text, dt_str, src, desc, use_desc))
@@ -222,6 +230,7 @@ def fetch_ynet(source_config):
     channel_name = source_config.get('name', 'Ynet')
     use_desc = args.use_description if args.use_description else source_config.get('use_description', False)
     src_filter = source_config.get('source_filter')
+    block_words = [w.lower() for w in BLOCK_WORDS + source_config.get('block_words', [])]
 
     # Retry up to 3 times on failure
     doc = None
@@ -251,6 +260,9 @@ def fetch_ynet(source_config):
         title_text = "".join(t.itertext()).strip()
         dt_str = tm.get("datetime")
         if dt_str:
+            # Skip items with blocked words in title or description
+            if any(word in title_text.lower() for word in block_words):
+                continue
             try:
                 dt = parse_datetime(dt_str)
                 items.append((dt, title_text, dt_str, channel_name, '', use_desc))

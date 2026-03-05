@@ -298,6 +298,7 @@ def print_item(title, ts, src, desc='', use_desc=False):
     if lang == 'he':
         # Isolate Latin characters for proper RTL rendering
         def isolate_latin(text):
+            text = text.replace('"', '״')
             return re.sub(r'([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)', rf'{lri}\1{pdi}', text)
 
         title_isolated = isolate_latin(title)

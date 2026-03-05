@@ -73,7 +73,7 @@ else:
     if not enabled_sources:
         enabled_sources = [{'url': 'https://rss.mivzakim.net/rss/category/1', 'name': 'Mivzakim', 'use_description': False}]
 
-seen = deque(maxlen=10*MAX_ITEMS)
+seen = deque(maxlen=100*MAX_ITEMS)
 first_poll = True
 last_spoken = None
 

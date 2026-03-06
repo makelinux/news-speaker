@@ -6,6 +6,7 @@ import time
 import argparse
 import subprocess
 import textwrap
+import html as html_lib
 from datetime import datetime, timedelta
 from io import BytesIO
 from collections import deque
@@ -302,10 +303,13 @@ def print_item(title, ts, src, desc='', use_desc=False):
     import re
     title = re.sub(r'\s*\([^)]+\)\s*$', '', title)
 
+    # Decode HTML entities in title
+    title = html_lib.unescape(title)
+
     # Strip HTML tags from description
     if desc:
         desc = re.sub(r'<[^>]+>', '', desc)
-        desc = re.sub(r'&\w+;', ' ', desc)  # Remove HTML entities
+        desc = html_lib.unescape(desc)
         desc = ' '.join(desc.split())  # Normalize whitespace
 
     lang = detect(title)

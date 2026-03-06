@@ -310,9 +310,12 @@ def print_item(title, ts, src, desc='', use_desc=False):
         desc = html_lib.unescape(desc)
         desc = ' '.join(desc.split())  # Normalize whitespace
 
-    lang = detect(title)
+    try:
+        lang = detect(title)
+    except:
+        lang = 'he'
     if lang == 'he':
-        print(format_hebrew_title(f"{title} - {ts}", 102))
+        print(format_hebrew_title(f"{title} - {ts}", 110))
 
         if desc and use_desc:
             wrapped = textwrap.fill(desc, width=100, initial_indent=8*' ', subsequent_indent=8*' ')

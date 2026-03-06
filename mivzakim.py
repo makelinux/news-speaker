@@ -314,21 +314,17 @@ def print_item(title, ts, src, desc='', use_desc=False):
         lang = detect(title)
     except:
         lang = 'he'
+
+    line = f"{ts} - {title}"
     if lang == 'he':
-        print(format_hebrew_title(f"{title} - {ts}", 110))
+        print(format_hebrew_title(line, 110))
 
         if desc and use_desc:
             wrapped = textwrap.fill(desc, width=100, initial_indent=8*' ', subsequent_indent=8*' ')
             print(f"\n{wrapped}")
         print(f"{src}")
     else:
-        # Wrap long titles
-        title_line = f"{ts} - {title}"
-        if len(title_line) > 100:
-            wrapped_title = textwrap.fill(title_line, width=100, subsequent_indent=8*' ')
-            print(wrapped_title)
-        else:
-            print(title_line)
+        print(textwrap.fill(line, width=100, subsequent_indent=8*' '))
 
         if desc and use_desc:
             wrapped = textwrap.fill(desc, width=100, initial_indent=8*' ', subsequent_indent=8*' ')

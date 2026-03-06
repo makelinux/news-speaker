@@ -19,9 +19,7 @@ import pasimple
 from langdetect import detect
 import yaml
 
-rli = '\u2066'  # Right-to-Left Isolate
-lri = '\u2067'  # Left-to-Right Isolate
-pdi = '\u2069'  # Pop Directional Isolate
+from hebrew_format import format_hebrew_title
 
 def load_config(path=None):
     global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, BLOCK_WORDS
@@ -314,18 +312,7 @@ def print_item(title, ts, src, desc='', use_desc=False):
 
     lang = detect(title)
     if lang == 'he':
-        # Isolate Latin characters for proper RTL rendering
-        def isolate_latin(text):
-            text = text.replace('"', '״')
-            return re.sub(r'([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)', rf'{lri}\1{pdi}', text)
-
-        title_isolated = isolate_latin(title)
-        # Count added isolation marks (2 per Latin sequence) and adjust rjust
-        num_marks = (len(title_isolated) - len(title))
-        title_isolated_rj = title_isolated.rjust(102 + num_marks)
-
-        # RLI wrap with time on right (swapped order: time then dash)
-        print(f"{rli}{title_isolated_rj}{pdi} {lri}{ts} -{pdi}")
+        print(format_hebrew_title(f"{title} - {ts}", 102))
 
         if desc and use_desc:
             wrapped = textwrap.fill(desc, width=100, initial_indent=8*' ', subsequent_indent=8*' ')

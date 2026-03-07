@@ -324,7 +324,11 @@ def print_item(title, ts, src, desc='', use_desc=False):
 
     line = f"{ts} - {title}"
     if lang == 'he':
-        print(format_hebrew_title(line, WIDTH))
+        wrapped_lines = textwrap.wrap(line, width=WIDTH-8)
+        for i, wrapped_line in enumerate(wrapped_lines):
+            if i > 0:
+                wrapped_line = 8*' ' + wrapped_line
+            print(format_hebrew_title(wrapped_line, WIDTH))
 
         if desc and use_desc:
             wrapped = textwrap.fill(desc, width=WIDTH-38, initial_indent=8*' ', subsequent_indent=8*' ')

@@ -1,5 +1,6 @@
 sources:
-  - url: https://www.newsru.co.il/il/www/news/big
+  - name: newsru
+    url: https://www.newsru.co.il/il/www/news/big
     use_description: false
     block_words:
       - футбол

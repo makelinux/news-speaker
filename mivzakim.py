@@ -59,7 +59,11 @@ parser.add_argument('-D', '--use-description', action='store_true',
                     help='Include description field in display and TTS')
 parser.add_argument('--stat', action='store_true',
                     help='Show mean time statistics for all configured sources')
+parser.add_argument('-w', '--width', type=int,
+                    help='Output width (default: MANWIDTH env or 110)')
 args = parser.parse_args()
+
+WIDTH = args.width if args.width else int(os.environ.get('MANWIDTH', 110))
 
 if args.config:
     load_config(args.config)
@@ -176,10 +180,13 @@ def fetch_rss(source_config):
     if root is None:
         return []
 
-    channel_title_elem = root.find('.//channel/title')
-    if channel_title_elem is None:
-        channel_title_elem = root.find('.//{http://www.w3.org/2005/Atom}title')
-    channel_name = channel_title_elem.text.strip() if channel_title_elem is not None and channel_title_elem.text else source_config.get('name', '')
+    channel_name = source_config.get('name', '')
+    if not channel_name:
+        channel_title_elem = root.find('.//channel/title')
+        if channel_title_elem is None:
+            channel_title_elem = root.find('.//{http://www.w3.org/2005/Atom}title')
+        if channel_title_elem is not None and channel_title_elem.text:
+            channel_name = channel_title_elem.text.strip()
 
     use_desc = args.use_description if args.use_description else source_config.get('use_description', True)
     src_filter = source_config.get('source_filter')
@@ -317,19 +324,19 @@ def print_item(title, ts, src, desc='', use_desc=False):
 
     line = f"{ts} - {title}"
     if lang == 'he':
-        print(format_hebrew_title(line, 110))
+        print(format_hebrew_title(line, WIDTH))
 
         if desc and use_desc:
-            wrapped = textwrap.fill(desc, width=100, initial_indent=8*' ', subsequent_indent=8*' ')
+            wrapped = textwrap.fill(desc, width=WIDTH-38, initial_indent=8*' ', subsequent_indent=8*' ')
             print(f"\n{wrapped}")
-        print(f"{src}")
+        print(8*' ' + f"{src}")
     else:
-        print(textwrap.fill(line, width=100, subsequent_indent=8*' '))
+        print(textwrap.fill(line, width=WIDTH-8, subsequent_indent=8*' '))
 
         if desc and use_desc:
-            wrapped = textwrap.fill(desc, width=100, initial_indent=8*' ', subsequent_indent=8*' ')
+            wrapped = textwrap.fill(desc, width=WIDTH-38, initial_indent=8*' ', subsequent_indent=8*' ')
             print(f"\n{wrapped}")
-        print(f"{src.rjust(110)}")
+        print(f"{src.rjust(WIDTH-8)}")
     sys.stdout.flush()
     if poll_mode: #and not first_poll:
         text_to_speak = f"{title}. {desc}" if desc and use_desc else title

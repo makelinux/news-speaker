@@ -19,7 +19,7 @@ import pasimple
 from langdetect import detect
 import yaml
 
-from hebrew_format import format_hebrew_title
+from hebrew_format import format_rtl_text
 
 def load_config(path=None):
     global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, BLOCK_WORDS
@@ -328,7 +328,7 @@ def print_item(title, ts, src, desc='', use_desc=False):
         for i, wrapped_line in enumerate(wrapped_lines):
             if i > 0:
                 wrapped_line = 8*' ' + wrapped_line
-            print(format_hebrew_title(wrapped_line, WIDTH))
+            print(format_rtl_text(wrapped_line, WIDTH))
 
         if desc and use_desc:
             wrapped = textwrap.fill(desc, width=WIDTH-38, initial_indent=8*' ', subsequent_indent=8*' ')

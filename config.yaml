@@ -48,6 +48,9 @@ sources:
   - name: The New Stack
     url: https://thenewstack.io/feed
     use_description: false
+  - name: RedHat Next
+    url: https://next.redhat.com/feed/
+    use_description: false
 
 settings:
   max_items: 10

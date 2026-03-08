@@ -39,6 +39,8 @@ sources:
     url: https://thenewstack.io/feed
   - name: RedHat Next
     url: https://next.redhat.com/feed/
+  - name: arXiv AI
+    url: https://rss.arxiv.org/atom/cs.ai+cs.lg
 
 settings:
   max_items: 10

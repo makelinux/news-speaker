@@ -195,7 +195,7 @@ def fetch_rss(source_config):
         if channel_title_elem is not None and channel_title_elem.text:
             channel_name = channel_title_elem.text.strip()
 
-    use_desc = args.use_description if args.use_description else source_config.get('use_description', True)
+    use_desc = args.use_description if args.use_description else source_config.get('use_description', False)
     src_filter = source_config.get('source_filter')
     block_words = [w.lower() for w in BLOCK_WORDS + source_config.get('block_words', [])]
 

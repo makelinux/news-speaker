@@ -75,7 +75,13 @@ source_filter = args.source
 
 # Get sources from args or config
 if args.url:
-    enabled_sources = [{'url': args.url, 'name': '', 'use_description': args.use_description}]
+    # Look up configured name for URL
+    name = ''
+    for s in config.get('sources', []):
+        if s.get('url') == args.url:
+            name = s.get('name', '')
+            break
+    enabled_sources = [{'url': args.url, 'name': name, 'use_description': args.use_description}]
 else:
     sources = config.get('sources', [])
     enabled_sources = [s for s in sources if s.get('enabled', True)]
@@ -180,7 +186,8 @@ def fetch_rss(source_config):
     if root is None:
         return []
 
-    channel_name = source_config.get('name', '')
+    configured_name = source_config.get('name', '')
+    channel_name = configured_name
     if not channel_name:
         channel_title_elem = root.find('.//channel/title')
         if channel_title_elem is None:
@@ -211,7 +218,7 @@ def fetch_rss(source_config):
         if title is not None and title.text and pubdate is not None and pubdate.text:
             title_text = title.text.strip()
             dt_str = pubdate.text.strip()
-            src = source.text.strip().split(' - ')[0] if source is not None and source.text else channel_name
+            src = configured_name if configured_name else (source.text.strip().split(' - ')[0] if source is not None and source.text else channel_name)
             desc = description.text.strip() if description is not None and description.text else ''
 
             # Apply source filter if configured

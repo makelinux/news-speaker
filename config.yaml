@@ -13,7 +13,6 @@ sources:
     url: https://www.theregister.com/software/ai_ml/headlines.atom
   - name: AI News
     url: https://www.artificialintelligence-news.com/feed/
-    use_description: true
   - name: Wired
     url: https://www.wired.com/feed/tag/ai/latest/rss
     enabled: false

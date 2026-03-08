@@ -193,7 +193,7 @@ def fetch_rss(source_config):
     block_words = [w.lower() for w in BLOCK_WORDS + source_config.get('block_words', [])]
 
     items = []
-    for item in root.xpath('//item | //entry'):
+    for item in root.xpath('//*[local-name()="item" or local-name()="entry"]'):
         if len(items) >= MAX_ITEMS:
             break
         title = item.find('title')

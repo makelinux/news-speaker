@@ -3,7 +3,7 @@ sources:
     url: https://www.newsru.co.il/il/www/news/big
     use_description: false
     block_words:
-      - футбол
+      - футбол, дзюдо, гран-при, чемпионат
   - url: https://www.techmeme.com/feed.xml
     use_description: false
     #enabled: false
@@ -12,7 +12,12 @@ sources:
     use_description: false
     source_filter: Ynet  # Filter by source name (e.g., "N12"), null for all sources
     #enabled: false
-  - name: Wirted
+  - name: The Register AI
+    url: https://www.theregister.com/software/ai_ml/headlines.atom
+    use_description: false
+  - name: AI News
+    url: https://www.artificialintelligence-news.com/feed/
+  - name: Wired
     url: https://www.wired.com/feed/tag/ai/latest/rss
     enabled: false
   - name: Ynet

@@ -367,7 +367,12 @@ def parse_datetime(dt_str):
 
 def parse_time(dt_str):
     """Parse datetime string to local time string"""
-    return parse_datetime(dt_str).strftime('%H:%M')
+    dt = parse_datetime(dt_str)
+    today = datetime.now().date()
+    if dt.date() == today:
+        return dt.strftime('%H:%M')
+    else:
+        return dt.strftime('%a %H:%M')
 
 
 def print_mean_time(news_items):

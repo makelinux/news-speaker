@@ -95,6 +95,31 @@ def log_debug(msg):
         print(f"{msg}", file=sys.stderr)
 
 
+def is_audio_active():
+    """Check for any active audio or microphone usage"""
+    # Check PulseAudio/PipeWire for active audio streams
+    try:
+        result = subprocess.run(['pactl', 'list', 'sink-inputs', 'short'],
+                                capture_output=True, text=True, timeout=1)
+        if result.returncode == 0 and result.stdout.strip():
+            log_debug(f"Active audio streams: {len(result.stdout.strip().split(chr(10)))}")
+            return True
+    except Exception as e:
+        log_debug(f"pactl sink check failed: {e}")
+
+    # Check for active microphone (videoconferencing)
+    try:
+        result = subprocess.run(['pactl', 'list', 'source-outputs', 'short'],
+                                capture_output=True, text=True, timeout=1)
+        if result.returncode == 0 and result.stdout.strip():
+            log_debug(f"Active microphone usage: {len(result.stdout.strip().split(chr(10)))}")
+            return True
+    except Exception as e:
+        log_debug(f"pactl source check failed: {e}")
+
+    return False
+
+
 def pause_media():
     """Pause media playback if playing, return True if was playing"""
     try:
@@ -126,6 +151,9 @@ def speak_text(lang, text):
     was_playing = pause_media()
     if was_playing:
         time.sleep(0.5)
+    if is_audio_active():
+        log_debug("Skipping TTS - audio/video still active")
+        return
     try:
         if lang == 'he':
             lang = 'iw'

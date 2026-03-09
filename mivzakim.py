@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from collections import deque
 
-from lxml import html, etree
+from lxml import etree
 import requests
 from gtts import gTTS
 from pydub import AudioSegment
@@ -47,8 +47,6 @@ parser.add_argument('-p', '--poll', action='store_true',
                     help='Polling mode')
 parser.add_argument('-d', '--debug', action='store_true',
                     help='Enable debug output')
-parser.add_argument('-y', '--ynet', action='store_true',
-                    help='Use Ynet HTML source instead of RSS')
 parser.add_argument('-s', '--source', type=str,
                     help='Filter by source name (e.g., "Ynet", "N12")')
 parser.add_argument('-u', '--url', type=str,
@@ -70,7 +68,6 @@ if args.config:
 
 poll_mode = args.poll
 debug = args.debug
-use_ynet = args.ynet
 source_filter = args.source
 
 # Get sources from args or config
@@ -240,64 +237,10 @@ def fetch_rss(source_config):
     return items
 
 
-def fetch_ynet(source_config):
-    url = source_config.get('url', 'https://www.ynet.co.il/news/category/184')
-    channel_name = source_config.get('name', 'Ynet')
-    use_desc = args.use_description if args.use_description else source_config.get('use_description', False)
-    src_filter = source_config.get('source_filter')
-    block_words = [w.lower() for w in BLOCK_WORDS + source_config.get('block_words', [])]
-
-    # Retry up to 3 times on failure
-    doc = None
-    for attempt in range(3):
-        try:
-            response = requests.get(url, timeout=30)
-            response.raise_for_status()
-            log_debug(f"Fetched {len(response.content)} bytes from {url}")
-            doc = html.fromstring(response.content)
-            break
-        except Exception as e:
-            if attempt < 2:
-                log_debug(f"Attempt {attempt + 1} failed for {url}: {e}, retrying...")
-                time.sleep(1)
-            else:
-                print(f"Error fetching HTML from {url}: {e}", file=sys.stderr)
-                return []
-
-    if doc is None:
-        return []
-
-    titles = doc.xpath('//div[@class="title"]')
-    times = doc.xpath('//time[contains(@class, "DateDisplay")]')
-
-    items = []
-    for t, tm in zip(titles[:MAX_ITEMS], times[:MAX_ITEMS]):
-        title_text = "".join(t.itertext()).strip()
-        dt_str = tm.get("datetime")
-        if dt_str:
-            # Skip items with blocked words in title or description
-            if any(word in title_text.lower() for word in block_words):
-                continue
-            try:
-                dt = parse_datetime(dt_str)
-                items.append((dt, title_text, dt_str, channel_name, '', use_desc))
-            except Exception as e:
-                log_debug(f"Failed to parse date '{dt_str}': {e}")
-
-    log_debug(f"Found {len(items)} news items from {url} (limited to {MAX_ITEMS})")
-    return items
-
-
 def fetch_news():
-    if use_ynet:
-        return fetch_ynet({'url': 'https://www.ynet.co.il/news/category/184', 'name': 'Ynet', 'use_description': False})
-
     all_items = []
     for source in enabled_sources:
-        if source.get('type') == 'html':
-            items = fetch_ynet(source)
-        else:
-            items = fetch_rss(source)
+        items = fetch_rss(source)
         all_items.extend(items)
 
     # Sort by datetime (newest first)
@@ -430,7 +373,7 @@ def show_news(news_items):
 try:
     if args.stat:
         for src in enabled_sources:
-            items = fetch_rss(src) if src.get('type') != 'html' else fetch_ynet(src)
+            items = fetch_rss(src)
             if len(items) < 2:
                 continue
             mt = (items[0][0] - items[-1][0]) / (len(items) - 1)

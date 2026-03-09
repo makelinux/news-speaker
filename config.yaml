@@ -3,12 +3,13 @@ sources:
     url: https://www.newsru.co.il/il/www/news/big
     block_words:
       - футбол, дзюдо, гран-при, чемпионат
-  - url: https://www.techmeme.com/feed.xml
+  - name: Techmeme
+    url: https://www.techmeme.com/feed.xml
     #enabled: false
   - name: Mivzakim
     url: https://rss.mivzakim.net/rss/category/1
     source_filter: Ynet  # Filter by source name (e.g., "N12"), null for all sources
-    #enabled: false
+    enabled: false
   - name: The Register AI
     url: https://www.theregister.com/software/ai_ml/headlines.atom
   - name: AI News

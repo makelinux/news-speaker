@@ -206,8 +206,10 @@ def speak_text(lang, text):
             resume_media()
 
 
-def fetch_rss(source_config):
+def fetch_rss(source_config, limit=None):
     url = source_config['url']
+    if limit is None:
+        limit = MAX_ITEMS
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0',
         'Accept': 'application/rss+xml, application/xml, text/xml, */*'
@@ -251,7 +253,7 @@ def fetch_rss(source_config):
     feed_items = root.xpath('//*[local-name()="item" or local-name()="entry"]')
     items = []
     for item in feed_items:
-        if len(items) >= MAX_ITEMS:
+        if len(items) >= limit:
             break
         title = item.find('title')
         if title is None:
@@ -425,15 +427,19 @@ def show_news(news_items):
 try:
     if args.stat:
         for src in enabled_sources:
-            items = fetch_rss(src)
+            items = fetch_rss(src, limit=999999)
             if len(items) < 2:
                 continue
-            mt = (items[0][0] - items[-1][0]) / (len(items) - 1)
-            s = str(timedelta(seconds=int(mt.total_seconds())))
-            if s.startswith('0:'):
-                s = s[2:]
+            duration = items[0][0] - items[-1][0]
+            mt = duration / (len(items) - 1)
+            dur_str = str(timedelta(seconds=int(duration.total_seconds())))
+            mt_str = str(timedelta(seconds=int(mt.total_seconds())))
+            if dur_str.startswith('0:'):
+                dur_str = dur_str[2:]
+            if mt_str.startswith('0:'):
+                mt_str = mt_str[2:]
             name = src.get('name', src.get('url', 'Unknown'))
-            print(f"{name}: {s}")
+            print(f"{name}: {dur_str} {len(items)} items {mt_str}")
     elif poll_mode:
         # log_debug("Starting polling mode")
         while True:

@@ -23,7 +23,24 @@ def add_rtl_marks(text):
     """Add RTL marks and isolate Latin text"""
     t = text.replace('"', '״')
     t = t.replace('?', f'?{rlm}')
+    # First, protect Hebrew-number patterns (like ל-32) by marking them
+    # Use sequential Unicode private use characters as unique placeholders
+    hebrew_num_pattern = r'([\u0590-\u05FF]-\d+)'
+    placeholders = {}
+    def save_pattern(m):
+        # Use a unique Private Use Area character for each pattern
+        key = chr(0xE000 + len(placeholders))
+        placeholders[key] = m.group(1)
+        return key
+    t = re.sub(hebrew_num_pattern, save_pattern, t)
+
+    # Now isolate Latin/numbers (but not the protected patterns)
     t = re.sub(r'([A-Za-z0-9]+(?:[-:][A-Za-z0-9]+)*)', rf'{lri}\1{pdi}', t)
+
+    # Restore protected patterns
+    for key, value in placeholders.items():
+        t = t.replace(key, value)
+
     return t
 
 

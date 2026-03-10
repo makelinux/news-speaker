@@ -304,9 +304,8 @@ def print_item(title, ts, src, desc='', use_desc=False):
     if lang == 'he':
         wrapped_lines = textwrap.wrap(line, width=WIDTH-8)
         for i, wrapped_line in enumerate(wrapped_lines):
-            if i > 0:
-                wrapped_line = 8*' ' + wrapped_line
-            print(format_rtl_text(wrapped_line, WIDTH))
+            w = WIDTH - 8 if i > 0 else WIDTH
+            print(format_rtl_text(wrapped_line, w))
 
         if desc and use_desc:
             wrapped = textwrap.fill(desc, width=WIDTH-38, initial_indent=8*' ', subsequent_indent=8*' ')

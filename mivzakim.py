@@ -95,8 +95,41 @@ def log_debug(msg):
         print(f"{msg}", file=sys.stderr)
 
 
+def list_audio():
+    """List active audio playback and microphone usage"""
+    print("Active audio playback:")
+    try:
+        result = subprocess.run(['pactl', 'list', 'sink-inputs'],
+                                capture_output=True, text=True, timeout=2)
+        if result.returncode == 0:
+            found = False
+            for line in result.stdout.split('\n'):
+                if 'application.name' in line or 'application.process.binary' in line or 'media.name' in line:
+                    print(f"  {line.strip()}")
+                    found = True
+            if not found:
+                print("  None")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    print("\nActive microphone usage:")
+    try:
+        result = subprocess.run(['pactl', 'list', 'source-outputs'],
+                                capture_output=True, text=True, timeout=2)
+        if result.returncode == 0:
+            found = False
+            for line in result.stdout.split('\n'):
+                if 'application.name' in line or 'application.process.binary' in line or 'media.name' in line:
+                    print(f"  {line.strip()}")
+                    found = True
+            if not found:
+                print("  None")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+
 def is_audio_active():
-    """Check for any active audio or microphone usage"""
+    """Check for any active audio playback"""
     # Check PulseAudio/PipeWire for active audio streams
     try:
         result = subprocess.run(['pactl', 'list', 'sink-inputs', 'short'],
@@ -106,16 +139,6 @@ def is_audio_active():
             return True
     except Exception as e:
         log_debug(f"pactl sink check failed: {e}")
-
-    # Check for active microphone (videoconferencing)
-    try:
-        result = subprocess.run(['pactl', 'list', 'source-outputs', 'short'],
-                                capture_output=True, text=True, timeout=1)
-        if result.returncode == 0 and result.stdout.strip():
-            log_debug(f"Active microphone usage: {len(result.stdout.strip().split(chr(10)))}")
-            return True
-    except Exception as e:
-        log_debug(f"pactl source check failed: {e}")
 
     return False
 
@@ -192,11 +215,12 @@ def fetch_rss(source_config):
 
     # Retry up to 3 times on failure
     root = None
+    content_len = 0
     for attempt in range(3):
         try:
             response = requests.get(url, timeout=30, headers=headers)
             response.raise_for_status()
-            log_debug(f"Fetched {len(response.content)} bytes from {url}")
+            content_len = len(response.content)
             parser = etree.XMLParser(recover=True)
             root = etree.fromstring(response.content, parser)
             break
@@ -224,8 +248,9 @@ def fetch_rss(source_config):
     src_filter = source_config.get('source_filter')
     block_words = [w.lower() for w in BLOCK_WORDS + source_config.get('block_words', [])]
 
+    feed_items = root.xpath('//*[local-name()="item" or local-name()="entry"]')
     items = []
-    for item in root.xpath('//*[local-name()="item" or local-name()="entry"]'):
+    for item in feed_items:
         if len(items) >= MAX_ITEMS:
             break
         title = item.find('title')
@@ -261,7 +286,7 @@ def fetch_rss(source_config):
             except Exception as e:
                 log_debug(f"Failed to parse date '{dt_str}': {e}")
 
-    log_debug(f"Found {len(items)} news items from {url} (limited to {MAX_ITEMS})")
+    log_debug(f"{len(feed_items)} items {content_len} bytes {url}")
     return items
 
 

@@ -59,6 +59,8 @@ parser.add_argument('--stat', action='store_true',
                     help='Show mean time statistics for all configured sources')
 parser.add_argument('-w', '--width', type=int,
                     help='Output width (default: MANWIDTH env or 110)')
+parser.add_argument('--audio-active', action='store_true',
+                    help='Check if audio playback is active')
 args = parser.parse_args()
 
 WIDTH = args.width if args.width else int(os.environ.get('MANWIDTH', 110))
@@ -425,7 +427,29 @@ def show_news(news_items):
 
 
 try:
-    if args.stat:
+    if args.audio_active:
+        if is_audio_active():
+            # Show which apps are playing
+            try:
+                result = subprocess.run(['pactl', 'list', 'sink-inputs'],
+                                        capture_output=True, text=True, timeout=1)
+                if result.returncode == 0:
+                    apps = []
+                    for line in result.stdout.split('\n'):
+                        if 'application.name' in line:
+                            app = line.split('=')[1].strip().strip('"')
+                            apps.append(app)
+                    if apps:
+                        print(f"Audio playback is active: {', '.join(apps)}")
+                    else:
+                        print("Audio playback is active")
+            except:
+                print("Audio playback is active")
+            sys.exit(0)
+        else:
+            print("No audio playback")
+            sys.exit(1)
+    elif args.stat:
         for src in enabled_sources:
             items = fetch_rss(src, limit=999999)
             if len(items) < 2:

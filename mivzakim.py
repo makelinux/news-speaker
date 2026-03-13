@@ -149,14 +149,28 @@ def is_microphone_active():
 
 
 def is_audio_active():
-    """Check for any active audio playback"""
+    """Check for any active audio playback (not paused/corked)"""
     # Check PulseAudio/PipeWire for active audio streams
     try:
-        result = subprocess.run(['pactl', 'list', 'sink-inputs', 'short'],
+        result = subprocess.run(['pactl', 'list', 'sink-inputs'],
                                 capture_output=True, text=True, timeout=1)
         if result.returncode == 0 and result.stdout.strip():
-            log_debug(f"Active audio streams: {len(result.stdout.strip().split(chr(10)))}")
-            return True
+            # Check if any stream is not corked (i.e., actively playing)
+            lines = result.stdout.split('\n')
+            current_corked = None
+            active_count = 0
+            for line in lines:
+                if 'Sink Input #' in line:
+                    current_corked = None
+                if 'Corked:' in line:
+                    current_corked = 'yes' in line.lower()
+                if 'application.name' in line and current_corked == False:
+                    active_count += 1
+                    app = line.split('=')[1].strip().strip('"')
+                    log_debug(f"Active audio: {app}")
+            if active_count > 0:
+                log_debug(f"Active (not corked) audio streams: {active_count}")
+                return True
     except Exception as e:
         log_debug(f"pactl sink check failed: {e}")
 

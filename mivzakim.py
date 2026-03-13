@@ -250,7 +250,14 @@ def fetch_rss(source_config, limit=None):
 
     use_desc = args.use_description if args.use_description else source_config.get('use_description', False)
     src_filter = source_config.get('source_filter')
-    block_words = [w.lower() for w in BLOCK_WORDS + source_config.get('block_words', [])]
+    # Expand comma-separated words and strip whitespace
+    all_block_words = BLOCK_WORDS + source_config.get('block_words', [])
+    block_words = []
+    for word in all_block_words:
+        if ',' in word:
+            block_words.extend([w.strip().lower() for w in word.split(',')])
+        else:
+            block_words.append(word.lower())
 
     feed_items = root.xpath('//*[local-name()="item" or local-name()="entry"]')
     items = []

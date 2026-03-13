@@ -130,6 +130,24 @@ def list_audio():
         print(f"  Error: {e}")
 
 
+def is_microphone_active():
+    """Check if microphone is being used (videoconferencing)"""
+    try:
+        result = subprocess.run(['pactl', 'list', 'source-outputs'],
+                                capture_output=True, text=True, timeout=1)
+        if result.returncode == 0 and result.stdout.strip():
+            # Filter out GNOME Settings (just the level meter)
+            for line in result.stdout.split('\n'):
+                if 'application.name' in line:
+                    app = line.split('=')[1].strip().strip('"')
+                    if 'GNOME Settings' not in app:
+                        log_debug(f"Active microphone: {app}")
+                        return True
+    except Exception as e:
+        log_debug(f"pactl source check failed: {e}")
+    return False
+
+
 def is_audio_active():
     """Check for any active audio playback"""
     # Check PulseAudio/PipeWire for active audio streams
@@ -173,6 +191,11 @@ def resume_media():
 
 def speak_text(lang, text):
     """Speak text using gTTS"""
+    # Skip TTS during videoconferencing (microphone active)
+    if is_microphone_active():
+        log_debug("Skipping TTS - videoconferencing active")
+        return
+
     was_playing = pause_media()
     if was_playing:
         time.sleep(0.5)

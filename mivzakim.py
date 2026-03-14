@@ -213,9 +213,6 @@ def speak_text(lang, text):
     was_playing = pause_media()
     if was_playing:
         time.sleep(0.5)
-    if is_audio_active():
-        log_debug("Skipping TTS - audio/video still active")
-        return
     try:
         if lang == 'he':
             lang = 'iw'

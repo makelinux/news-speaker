@@ -2,7 +2,7 @@ sources:
   - name: newsru
     url: https://www.newsru.co.il/il/www/news/big
     block_words:
-      - футбол, дзюдо, гран-при, чемпионат
+      - футбол, дзюдо, гран-при, чемпионат, прыжки с шестом
   - name: Techmeme
     url: https://www.techmeme.com/feed.xml
     #enabled: false
@@ -33,6 +33,7 @@ sources:
     url: https://futurism.com/categories/ai-artificial-intelligence/feed
   - name: Phys.org ML
     url: https://phys.org/rss-feed/technology-news/machine-learning-ai/
+    enabled: false
   - name: The New Stack
     url: https://thenewstack.io/feed
   - name: RedHat Next

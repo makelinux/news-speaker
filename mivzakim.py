@@ -50,7 +50,7 @@ parser.add_argument('-d', '--debug', action='store_true',
 parser.add_argument('-s', '--source', type=str,
                     help='Filter by source name (e.g., "Ynet", "N12")')
 parser.add_argument('-u', '--url', type=str,
-                    help='Custom RSS URL')
+                    help='RSS URL or HTML page to list links')
 parser.add_argument('-c', '--config', type=str,
                     help='Path to config file (default: ./config.yaml)')
 parser.add_argument('-D', '--use-description', action='store_true',
@@ -95,6 +95,71 @@ def log_debug(msg):
     """Print debug message if debug mode enabled"""
     if debug:
         print(f"{msg}", file=sys.stderr)
+
+
+def list_html_links(url):
+    """List links from HTML page"""
+    import re
+    from urllib.parse import urljoin
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+
+        # Check if it's HTML or RSS/XML
+        content_type = response.headers.get('Content-Type', '').lower()
+        is_html = 'html' in content_type or '<html' in response.text[:500].lower()
+
+        if not is_html:
+            # Not HTML, treat as RSS
+            return False
+
+        response.encoding = 'utf-8'
+        html = response.text
+
+        # Try multiple section header patterns
+        section_patterns = [
+            r'<div class="subTitle">([^<]+)</div>',
+            r'<h2[^>]*>([^<]+)</h2>',
+            r'<h3[^>]*>([^<]+)</h3>',
+            r'<div[^>]*class="[^"]*(?:title|header|section)[^"]*"[^>]*>([^<]+)</div>',
+        ]
+
+        sections = None
+        for pat in section_patterns:
+            s = re.split(pat, html)
+            if len(s) > 1:
+                sections = s
+                break
+
+        if sections and len(sections) > 1:
+            # Found sections, group links by section
+            current_section = None
+            for i, part in enumerate(sections):
+                if i % 2 == 1:
+                    current_section = part.strip()
+                    print(f"\n{current_section}")
+                elif i % 2 == 0 and current_section:
+                    matches = re.findall(r'href="([^"]+)"[^>]*>([^<]+)</a>', part)
+                    for link, text in matches:
+                        text = text.strip()
+                        if text and not text.isspace():
+                            if link.startswith('/'):
+                                link = urljoin(url, link)
+                            print(f"{text} - {link}")
+        else:
+            # No sections, just extract all links
+            matches = re.findall(r'href="([^"]+)"[^>]*>([^<]+)</a>', html)
+            for link, text in matches:
+                text = text.strip()
+                if text and not text.isspace():
+                    if link.startswith('/'):
+                        link = urljoin(url, link)
+                    print(f"{text} - {link}")
+
+        return True
+    except Exception as e:
+        print(f"Error fetching HTML: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def list_audio():
@@ -468,6 +533,12 @@ def show_news(news_items):
 
 
 try:
+    # Check if URL is HTML (link listing mode)
+    if args.url:
+        if list_html_links(args.url):
+            sys.exit(0)
+        # If not HTML, continue to treat as RSS
+
     if args.audio_active:
         mic_active = is_microphone_active()
         audio_active = is_audio_active()

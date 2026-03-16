@@ -19,6 +19,8 @@ sources:
     enabled: false
   - name: Ynet
     url: https://www.ynet.co.il/Integration/StoryRss1854.xml
+  - name: ynet - דיגיטל
+    url: https://www.ynet.co.il/Integration/StoryRss544.xml
   - name: The Decoder
     url: https://the-decoder.com/feed/
   - name: Guardian AI

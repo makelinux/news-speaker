@@ -34,8 +34,9 @@ def add_rtl_marks(text):
         return key
     t = re.sub(hebrew_num_pattern, save_pattern, t)
 
-    # Now isolate Latin/numbers (but not the protected patterns)
-    t = re.sub(r'([A-Za-z0-9]+(?:[-:][A-Za-z0-9]+)*)', rf'{lri}\1{pdi}', t)
+    # Isolate Latin text and multi-char numbers (but not single digits or protected patterns)
+    t = re.sub(r'([A-Za-z]+(?:[-:][A-Za-z0-9]+)*)', rf'{lri}\1{pdi}', t)
+    t = re.sub(r'(\d{2,}(?:[-:][A-Za-z0-9]+)*)', rf'{lri}\1{pdi}', t)
 
     # Restore protected patterns
     for key, value in placeholders.items():

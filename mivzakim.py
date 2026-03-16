@@ -436,10 +436,13 @@ def print_item(title, ts, src, desc='', use_desc=False):
         lang = 'he'
 
     line = f"{ts} - {title}"
+    log_debug(f"WIDTH={WIDTH}")
     if lang == 'he':
         wrapped_lines = textwrap.wrap(line, width=WIDTH-8)
+        log_debug(f"lines={len(wrapped_lines)}")
         for i, wrapped_line in enumerate(wrapped_lines):
             w = WIDTH - 8 if i > 0 else WIDTH
+            log_debug(f"{wrapped_line}")
             print(format_rtl_text(wrapped_line, w))
 
         if desc and use_desc:

@@ -102,7 +102,8 @@ def list_html_links(url):
     import re
     from urllib.parse import urljoin
     try:
-        response = requests.get(url, timeout=10)
+        h = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0'}
+        response = requests.get(url, timeout=10, headers=h)
         response.raise_for_status()
 
         # Check if it's HTML or RSS/XML

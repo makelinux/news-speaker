@@ -21,6 +21,11 @@ import yaml
 
 from hebrew_format import format_rtl_text
 
+session = requests.Session()
+session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0',
+})
+
 def load_config(path=None):
     global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, BLOCK_WORDS
     if path is None:
@@ -102,8 +107,7 @@ def list_html_links(url):
     import re
     from urllib.parse import urljoin
     try:
-        h = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0'}
-        response = requests.get(url, timeout=10, headers=h)
+        response = session.get(url, timeout=10)
         response.raise_for_status()
 
         # Check if it's HTML or RSS/XML
@@ -288,6 +292,7 @@ def speak_text(lang, text):
         tts.write_to_fp(buf)
         buf.seek(0)
         audio = AudioSegment.from_mp3(buf)
+        buf.close()
         audio += TTS_VOLUME_ADJUST
         with pasimple.PaSimple(
             pasimple.PA_STREAM_PLAYBACK,
@@ -312,17 +317,14 @@ def fetch_rss(source_config, limit=None):
     url = source_config['url']
     if limit is None:
         limit = MAX_ITEMS
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*'
-    }
+    headers = {'Accept': 'application/rss+xml, application/xml, text/xml, */*'}
 
     # Retry up to 3 times on failure
     root = None
     content_len = 0
     for attempt in range(3):
         try:
-            response = requests.get(url, timeout=30, headers=headers)
+            response = session.get(url, timeout=30, headers=headers)
             response.raise_for_status()
             content_len = len(response.content)
             parser = etree.XMLParser(recover=True)

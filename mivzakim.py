@@ -3,6 +3,7 @@
 import sys
 import os
 import time
+import json
 import argparse
 import subprocess
 import textwrap
@@ -95,6 +96,31 @@ else:
 seen = deque(maxlen=100*MAX_ITEMS)
 first_poll = True
 last_spoken = None
+
+# Per-source backoff state: url -> {skip_until, delay}
+backoff = {}
+BACKOFF_FILE = os.path.join(os.path.dirname(__file__), '.backoff.json')
+BASE_DELAY = 60
+
+def load_backoff():
+    global backoff
+    try:
+        with open(BACKOFF_FILE) as f:
+            saved = json.load(f)
+        for url, delay in saved.items():
+            backoff[url] = {'skip_until': time.time() + delay, 'delay': delay}
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+def save_backoff():
+    saved = {url: s['delay'] for url, s in backoff.items() if s['delay'] > BASE_DELAY}
+    try:
+        with open(BACKOFF_FILE, 'w') as f:
+            json.dump(saved, f)
+    except OSError:
+        pass
+
+load_backoff()
 
 def log_debug(msg):
     """Print debug message if debug mode enabled"""
@@ -315,8 +341,18 @@ def speak_text(lang, text):
 
 def fetch_rss(source_config, limit=None):
     url = source_config['url']
+    name = source_config.get('name', url)
     if limit is None:
         limit = MAX_ITEMS
+
+    # Check backoff
+    s = backoff.get(url)
+    if s and time.time() < s['skip_until']:
+        r = int(s['skip_until'] - time.time())
+        t = f"{r // 3600}h" if r >= 3600 else f"{r // 60}m" if r >= 60 else f"{r}s"
+        log_debug(f"Backoff {name} for {t}")
+        return []
+
     headers = {'Accept': 'application/rss+xml, application/xml, text/xml, */*'}
 
     # Retry up to 3 times on failure
@@ -330,16 +366,39 @@ def fetch_rss(source_config, limit=None):
             parser = etree.XMLParser(recover=True)
             root = etree.fromstring(response.content, parser)
             break
-        except Exception as e:
+        except requests.exceptions.HTTPError as e:
+            if response.status_code == 429:
+                if url not in backoff:
+                    backoff[url] = {'skip_until': 0, 'delay': BASE_DELAY}
+                backoff[url]['delay'] = min(backoff[url]['delay'] * 2, 3600)
+                backoff[url]['skip_until'] = time.time() + backoff[url]['delay']
+                save_backoff()
+                d = backoff[url]['delay']
+                t = f"{d // 3600}h" if d >= 3600 else f"{d // 60}m" if d >= 60 else f"{d}s"
+                print(f"{name}: 429 too many requests, backing off {t}", file=sys.stderr)
+                return []
             if attempt < 2:
-                log_debug(f"Attempt {attempt + 1} failed for {url}: {e}, retrying...")
+                log_debug(f"Attempt {attempt + 1} failed for {name}: {response.status_code}")
                 time.sleep(1)
             else:
-                print(f"Error fetching RSS from {url}: {e}", file=sys.stderr)
+                print(f"{name}: {response.status_code} {response.reason}", file=sys.stderr)
+                return []
+        except Exception as e:
+            if attempt < 2:
+                log_debug(f"Attempt {attempt + 1} failed for {name}: {e}, retrying...")
+                time.sleep(1)
+            else:
+                print(f"{name}: {e}", file=sys.stderr)
                 return []
 
     if root is None:
         return []
+
+    # Success - reduce backoff if previously backing off
+    if url in backoff:
+        log_debug(f"{name}: success, backoff was {backoff[url]['delay']}s")
+        save_backoff()
+
 
     configured_name = source_config.get('name', '')
     channel_name = configured_name

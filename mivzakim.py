@@ -383,6 +383,13 @@ def fetch_rss(source_config, limit=None):
             else:
                 print(f"{name}: {response.status_code} {response.reason}", file=sys.stderr)
                 return []
+        except requests.exceptions.ConnectionError as e:
+            # DNS, refused, etc - deterministic, don't retry
+            cause = e
+            while cause.__cause__:
+                cause = cause.__cause__
+            print(f"{name}: {cause}", file=sys.stderr)
+            return []
         except Exception as e:
             if attempt < 2:
                 log_debug(f"Attempt {attempt + 1} failed for {name}: {e}, retrying...")

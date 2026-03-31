@@ -370,7 +370,7 @@ def fetch_rss(source_config, limit=None):
             if response.status_code == 429:
                 if url not in backoff:
                     backoff[url] = {'skip_until': 0, 'delay': BASE_DELAY}
-                backoff[url]['delay'] *= 2
+                backoff[url]['delay'] = min(backoff[url]['delay'] * 2, 3600)
                 backoff[url]['skip_until'] = time.time() + backoff[url]['delay']
                 save_backoff()
                 d = backoff[url]['delay']

@@ -370,7 +370,7 @@ def fetch_rss(source_config, limit=None):
             if response.status_code == 429:
                 if url not in backoff:
                     backoff[url] = {'skip_until': 0, 'delay': BASE_DELAY}
-                backoff[url]['delay'] = min(backoff[url]['delay'] * 2, 3600)
+                backoff[url]['delay'] = min(backoff[url]['delay'] * 2, 86400)
                 backoff[url]['skip_until'] = time.time() + backoff[url]['delay']
                 save_backoff()
                 d = backoff[url]['delay']
@@ -385,10 +385,15 @@ def fetch_rss(source_config, limit=None):
                 return []
         except requests.exceptions.ConnectionError as e:
             # DNS, refused, etc - deterministic, don't retry
-            cause = e
-            while cause.__cause__:
-                cause = cause.__cause__
-            print(f"{name}: {cause}", file=sys.stderr)
+            if url not in backoff:
+                backoff[url] = {'skip_until': 0, 'delay': BASE_DELAY}
+            backoff[url]['delay'] = min(backoff[url]['delay'] * 2, 86400)
+            backoff[url]['skip_until'] = time.time() + backoff[url]['delay']
+            save_backoff()
+            reason = getattr(e.args[0], 'reason', e) if e.args else e
+            d = backoff[url]['delay']
+            t = f"{d // 3600}h" if d >= 3600 else f"{d // 60}m" if d >= 60 else f"{d}s"
+            print(f"{name}: {type(reason).__name__}, backing off {t}", file=sys.stderr)
             return []
         except Exception as e:
             if attempt < 2:

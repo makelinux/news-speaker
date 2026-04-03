@@ -67,6 +67,8 @@ parser.add_argument('-w', '--width', type=int,
                     help='Output width (default: MANWIDTH env or 110)')
 parser.add_argument('--audio-active', action='store_true',
                     help='Check if audio playback is active')
+parser.add_argument('--no-tts', action='store_true',
+                    help='Disable TTS')
 args = parser.parse_args()
 
 WIDTH = args.width if args.width else int(os.environ.get('MANWIDTH', 110))
@@ -93,7 +95,7 @@ else:
     if not enabled_sources:
         enabled_sources = [{'url': 'https://rss.mivzakim.net/rss/category/1', 'name': 'Mivzakim', 'use_description': False}]
 
-seen = deque(maxlen=100*MAX_ITEMS)
+seen = deque(maxlen=10000)
 first_poll = True
 last_spoken = None
 
@@ -108,7 +110,7 @@ def load_backoff():
         with open(BACKOFF_FILE) as f:
             saved = json.load(f)
         for url, delay in saved.items():
-            backoff[url] = {'skip_until': time.time() + delay, 'delay': delay}
+            backoff[url] = {'skip_until': time.time() + delay, 'delay': delay, 'from_file': True}
     except (FileNotFoundError, json.JSONDecodeError):
         pass
 
@@ -406,10 +408,21 @@ def fetch_rss(source_config, limit=None):
     if root is None:
         return []
 
-    # Success - reduce backoff if previously backing off
+    # Success after backoff
     if url in backoff:
+        from_file = backoff[url].get('from_file')
         log_debug(f"{name}: success, backoff was {backoff[url]['delay']}s")
+        del backoff[url]
         save_backoff()
+        if from_file:
+            # First recovery after startup - seed seen, don't flood
+            for item in root.xpath('//*[local-name()="item" or local-name()="entry"]'):
+                t = item.find('title')
+                if t is None:
+                    t = item.find('.//{http://www.w3.org/2005/Atom}title')
+                if t is not None and t.text:
+                    seen.append(t.text.strip())
+            return []
 
 
     configured_name = source_config.get('name', '')
@@ -482,7 +495,7 @@ def fetch_news():
 
     # Sort by datetime (newest first)
     all_items.sort(key=lambda x: x[0], reverse=True)
-    log_debug(f"Total items from all sources: {len(all_items)}")
+    log_debug(f"Total items: {len(all_items)}, seen: {len(seen)}, first_poll: {first_poll}")
 
     return all_items
 
@@ -531,7 +544,7 @@ def print_item(title, ts, src, desc='', use_desc=False):
             print(f"\n{wrapped}")
         print(f"{src.rjust(WIDTH-8)}")
     sys.stdout.flush()
-    if poll_mode: #and not first_poll:
+    if poll_mode and not args.no_tts:
         text_to_speak = f"{title}. {desc}" if desc and use_desc else title
         text_to_speak = text_to_speak.strip()
         if text_to_speak != last_spoken:
@@ -588,10 +601,8 @@ def show_news(news_items):
         if source_filter and source_filter not in src:
             continue
         if poll_mode and first_poll:
-            # Mark all as seen, collect only first item
+            # Mark all as seen, don't display
             seen.append(title_text)
-            if i == 0:
-                items.append((title_text, parse_time(dt_str), src, desc, use_desc))
         else:
             # Normal mode or subsequent polls
             if title_text not in seen:

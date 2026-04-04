@@ -718,6 +718,7 @@ try:
             print("No audio activity")
             sys.exit(1)
     elif args.stat:
+        print("source: duration items mean_interval")
         for src in enabled_sources:
             items = fetch_rss(src, limit=999999)
             if len(items) < 2:

@@ -1,4 +1,8 @@
 sources:
+  - name: maariv
+    url: https://www.maariv.co.il/rss/rssfeedsmivzakichadashot
+  - name: phoronix
+    url: https://www.phoronix.com/rss.php
   - name: newsru
     url: https://www.newsru.co.il/il/www/news/big
     block_words:
@@ -29,6 +33,8 @@ sources:
     url: https://thenextweb.com/neural/feed
   - name: HackerNoon AI
     url: https://hackernoon.com/tagged/ai/feed
+    min_interval: 3600
+    #enabled: false
   - name: SiliconAngle AI
     url: https://siliconangle.com/category/ai/feed
   - name: Futurism AI

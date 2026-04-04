@@ -115,7 +115,10 @@ def load_backoff():
         pass
 
 def save_backoff():
-    saved = {url: s['delay'] for url, s in backoff.items() if s['delay'] > BASE_DELAY}
+    # Don't save min_interval entries - they're in config
+    min_urls = {s['url'] for s in config.get('sources', []) if s.get('min_interval')}
+    saved = {url: s['delay'] for url, s in backoff.items()
+             if s['delay'] > BASE_DELAY and url not in min_urls}
     try:
         with open(BACKOFF_FILE, 'w') as f:
             json.dump(saved, f)
@@ -123,6 +126,18 @@ def save_backoff():
         pass
 
 load_backoff()
+net_ok = None  # None=untested, True/False per poll cycle
+
+def check_network():
+    global net_ok
+    if net_ok is not None:
+        return net_ok
+    try:
+        session.head('https://www.google.com', timeout=5)
+        net_ok = True
+    except Exception:
+        net_ok = False
+    return net_ok
 
 def log_debug(msg):
     """Print debug message if debug mode enabled"""
@@ -347,6 +362,11 @@ def fetch_rss(source_config, limit=None):
     if limit is None:
         limit = MAX_ITEMS
 
+    # Check min_interval
+    min_iv = source_config.get('min_interval', 0)
+    if min_iv and url not in backoff:
+        backoff[url] = {'skip_until': 0, 'delay': min_iv}
+
     # Check backoff
     s = backoff.get(url)
     if s and time.time() < s['skip_until']:
@@ -386,13 +406,17 @@ def fetch_rss(source_config, limit=None):
                 print(f"{name}: {response.status_code} {response.reason}", file=sys.stderr)
                 return []
         except requests.exceptions.ConnectionError as e:
-            # DNS, refused, etc - deterministic, don't retry
+            reason = getattr(e.args[0], 'reason', e) if e.args else e
+            if not check_network():
+                # General network failure, don't penalize this source
+                log_debug(f"{name}: network down, skipping backoff")
+                return []
+            # Source-specific failure, apply backoff
             if url not in backoff:
                 backoff[url] = {'skip_until': 0, 'delay': BASE_DELAY}
             backoff[url]['delay'] = min(backoff[url]['delay'] * 2, 86400)
             backoff[url]['skip_until'] = time.time() + backoff[url]['delay']
             save_backoff()
-            reason = getattr(e.args[0], 'reason', e) if e.args else e
             d = backoff[url]['delay']
             t = f"{d // 3600}h" if d >= 3600 else f"{d // 60}m" if d >= 60 else f"{d}s"
             print(f"{name}: {type(reason).__name__}, backing off {t}", file=sys.stderr)
@@ -412,16 +436,29 @@ def fetch_rss(source_config, limit=None):
     if url in backoff:
         from_file = backoff[url].get('from_file')
         log_debug(f"{name}: success, backoff was {backoff[url]['delay']}s")
-        del backoff[url]
+        if min_iv:
+            backoff[url] = {'skip_until': time.time() + min_iv, 'delay': min_iv}
+        else:
+            del backoff[url]
         save_backoff()
         if from_file:
             # First recovery after startup - seed seen, don't flood
             for item in root.xpath('//*[local-name()="item" or local-name()="entry"]'):
-                t = item.find('title')
-                if t is None:
-                    t = item.find('.//{http://www.w3.org/2005/Atom}title')
-                if t is not None and t.text:
-                    seen.append(t.text.strip())
+                g = item.find('guid')
+                if g is None:
+                    g = item.find('link')
+                if g is None:
+                    link = item.find('.//{http://www.w3.org/2005/Atom}link')
+                    key = link.get('href', '') if link is not None else ''
+                else:
+                    key = g.text.strip() if g.text else ''
+                if not key:
+                    t = item.find('title')
+                    if t is None:
+                        t = item.find('.//{http://www.w3.org/2005/Atom}title')
+                    key = t.text.strip() if t is not None and t.text else ''
+                if key:
+                    seen.append(key)
             return []
 
 
@@ -462,6 +499,14 @@ def fetch_rss(source_config, limit=None):
         description = item.find('description')
         if description is None:
             description = item.find('.//{http://www.w3.org/2005/Atom}summary')
+        guid = item.find('guid')
+        if guid is None:
+            guid = item.find('link')
+        if guid is None:
+            link = item.find('.//{http://www.w3.org/2005/Atom}link')
+            guid_text = link.get('href', '') if link is not None else ''
+        else:
+            guid_text = guid.text.strip() if guid.text else ''
         if title is not None and title.text and pubdate is not None and pubdate.text:
             title_text = title.text.strip()
             dt_str = pubdate.text.strip()
@@ -479,7 +524,8 @@ def fetch_rss(source_config, limit=None):
 
             try:
                 dt = parse_datetime(dt_str)
-                items.append((dt, title_text, dt_str, src, desc, use_desc))
+                key = guid_text or title_text
+                items.append((dt, title_text, dt_str, src, desc, use_desc, key))
             except Exception as e:
                 log_debug(f"Failed to parse date '{dt_str}': {e}")
 
@@ -488,6 +534,8 @@ def fetch_rss(source_config, limit=None):
 
 
 def fetch_news():
+    global net_ok
+    net_ok = None  # Reset per poll cycle
     all_items = []
     for source in enabled_sources:
         items = fetch_rss(source)
@@ -598,15 +646,16 @@ def show_news(news_items):
         dt, title_text, dt_str, src = item[0], item[1], item[2], item[3]
         desc = item[4] if len(item) > 4 else ''
         use_desc = item[5] if len(item) > 5 else False
+        key = item[6] if len(item) > 6 else title_text
         if source_filter and source_filter not in src:
             continue
         if poll_mode and first_poll:
             # Mark all as seen, don't display
-            seen.append(title_text)
+            seen.append(key)
         else:
             # Normal mode or subsequent polls
-            if title_text not in seen:
-                seen.append(title_text)
+            if key not in seen:
+                seen.append(key)
                 items.insert(0, (title_text, parse_time(dt_str), src, desc, use_desc))
                 if not poll_mode and len(items) >= MAX_ITEMS:
                     break

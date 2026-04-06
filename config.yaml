@@ -1,6 +1,10 @@
 sources:
+  - name: maariv-tech
+    url: https://www.maariv.co.il/rss/rssfeedstechnologeya
   - name: maariv
     url: https://www.maariv.co.il/rss/rssfeedsmivzakichadashot
+    block_words:
+      - האח הגדול
   - name: phoronix
     url: https://www.phoronix.com/rss.php
   - name: newsru

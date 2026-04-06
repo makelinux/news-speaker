@@ -318,14 +318,6 @@ def resume_media():
 
 def speak_text(lang, text):
     """Speak text using gTTS"""
-    # Skip TTS during videoconferencing (microphone active)
-    if is_microphone_active():
-        log_debug("Skipping TTS - videoconferencing active")
-        return
-
-    was_playing = pause_media()
-    if was_playing:
-        time.sleep(0.5)
     try:
         if lang == 'he':
             lang = 'iw'
@@ -350,10 +342,6 @@ def speak_text(lang, text):
         log_debug("TTS completed")
     except Exception as e:
         print(f"TTS error: {e}", file=sys.stderr)
-    finally:
-        if was_playing:
-            time.sleep(0.5)
-            resume_media()
 
 
 def fetch_rss(source_config, limit=None):
@@ -592,7 +580,7 @@ def print_item(title, ts, src, desc='', use_desc=False):
             print(f"\n{wrapped}")
         print(f"{src.rjust(WIDTH-8)}")
     sys.stdout.flush()
-    if poll_mode and not args.no_tts:
+    if poll_mode and not args.no_tts and not is_microphone_active():
         text_to_speak = f"{title}. {desc}" if desc and use_desc else title
         text_to_speak = text_to_speak.strip()
         if text_to_speak != last_spoken:
@@ -660,11 +648,24 @@ def show_news(news_items):
                 if not poll_mode and len(items) >= MAX_ITEMS:
                     break
 
+    # Pause media once before speaking all items
+    tts_items = poll_mode and not args.no_tts and items
+    if tts_items and not is_microphone_active():
+        was_playing = pause_media()
+        if was_playing:
+            time.sleep(0.5)
+    else:
+        was_playing = False
+
     for item in items:
         title, ts, src = item[0], item[1], item[2]
         desc = item[3] if len(item) > 3 else ''
         use_desc = item[4] if len(item) > 4 else False
         print_item(title, ts, src, desc, use_desc)
+
+    if was_playing:
+        time.sleep(0.5)
+        resume_media()
 
     first_poll = False
 

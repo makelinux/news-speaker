@@ -139,6 +139,13 @@ def check_network():
         net_ok = False
     return net_ok
 
+def status(msg=''):
+    """Show status on current line, wipe with empty call"""
+    if msg:
+        print(f"\r{msg}\033[K", end='', flush=True, file=sys.stderr)
+    else:
+        print(f"\r\033[K", end='', flush=True, file=sys.stderr)
+
 def log_debug(msg):
     """Print debug message if debug mode enabled"""
     if debug:
@@ -526,8 +533,10 @@ def fetch_news():
     net_ok = None  # Reset per poll cycle
     all_items = []
     for source in enabled_sources:
+        status(source.get('name', source['url']))
         items = fetch_rss(source)
         all_items.extend(items)
+    status()
 
     # Sort by datetime (newest first)
     all_items.sort(key=lambda x: x[0], reverse=True)
@@ -742,8 +751,9 @@ try:
             if args.url and first_poll:
                 print_mean_time(news)
             show_news(news)
-            # log_debug(f"Sleeping {POLL_INTERVAL} seconds...")
+            status("waiting")
             time.sleep(POLL_INTERVAL)
+            status()
     else:
         log_debug("Running in normal mode")
         os.system('clear')

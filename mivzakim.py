@@ -630,12 +630,23 @@ def show_popup(items):
     popup_window.show_all()
     while Gtk.events_pending():
         Gtk.main_iteration()
+    time.sleep(0.1)
+    while Gtk.events_pending():
+        Gtk.main_iteration()
+
+def flush_gtk():
+    import gi
+    gi.require_version('Gtk', '3.0')
+    from gi.repository import Gtk
+    while Gtk.events_pending():
+        Gtk.main_iteration()
 
 def hide_popup():
     global popup_window
     if popup_window:
         popup_window.destroy()
         popup_window = None
+        flush_gtk()
 
 
 def print_item(title, ts, src, desc='', use_desc=False):
@@ -769,7 +780,7 @@ def show_news(news_items):
         print_item(title, ts, src, desc, use_desc)
 
     if popup_window:
-        time.sleep(1)
+        flush_gtk()
         hide_popup()
 
     if was_playing:
@@ -845,10 +856,7 @@ try:
             print(f"{name}: {dur_str} {len(items)} items {mt_str}")
     elif args.test_popup:
         items = [
-            ('שיגורים בודדים מאיראן: הדי פיצוצים בחיפה', '07:22', 'Ynet'),
-            ('פיקוד העורף: ניתן לצאת מהמרחבים המוגנים בצפון', '07:31', 'Ynet'),
-            ('Sources: Meta has paused its work with Mercor', '00:45', 'Techmeme'),
-            ('בעקבות נאום טראמפ: עלייה נוספת במחירי הנפט', '08:09', 'maariv'),
+            ('הראשון השני השלישי', '07:22', 'test'),
         ]
         show_popup(items)
         import gi

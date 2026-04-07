@@ -71,6 +71,8 @@ parser.add_argument('--no-tts', action='store_true',
                     help='Disable TTS')
 parser.add_argument('--word-freq', action='store_true',
                     help='Show word frequencies across all sources')
+parser.add_argument('--test-popup', action='store_true',
+                    help='Show test popup window')
 args = parser.parse_args()
 
 WIDTH = args.width if args.width else int(os.environ.get('MANWIDTH', 110))
@@ -560,6 +562,80 @@ def fetch_news():
     return all_items
 
 
+popup_window = None
+
+def is_dark_theme():
+    try:
+        r = subprocess.run(
+            ['gsettings', 'get', 'org.gnome.desktop.interface', 'color-scheme'],
+            capture_output=True, text=True, timeout=1)
+        if r.returncode == 0 and 'dark' in r.stdout.lower():
+            return True
+        r = subprocess.run(
+            ['gsettings', 'get', 'org.gnome.desktop.interface', 'gtk-theme'],
+            capture_output=True, text=True, timeout=1)
+        if r.returncode == 0 and 'dark' in r.stdout.lower():
+            return True
+    except Exception:
+        pass
+    return False
+
+def show_popup(items):
+    """Show news items in a topmost GTK popup window"""
+    global popup_window
+    import gi
+    gi.require_version('Gtk', '3.0')
+    from gi.repository import Gtk, Gdk
+
+    hide_popup()
+    if not items:
+        return
+
+    dark = is_dark_theme()
+    bg = Gdk.RGBA()
+    bg.parse("#222" if dark else "#f0f0f0")
+    fg = "#eee" if dark else "#111"
+
+    popup_window = Gtk.Window(title="News")
+    popup_window.set_decorated(False)
+    popup_window.set_keep_above(True)
+    popup_window.override_background_color(Gtk.StateFlags.NORMAL, bg)
+
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+    box.set_margin_start(10)
+    box.set_margin_end(10)
+    box.set_margin_top(10)
+    box.set_margin_bottom(10)
+    popup_window.add(box)
+
+    for title, ts, src, *_ in items:
+        text = f"{ts} - {title}  [{src}]"
+        label = Gtk.Label(label=text)
+        label.set_xalign(1.0)
+        label.set_line_wrap(True)
+        label.modify_fg(Gtk.StateFlags.NORMAL, Gdk.color_parse(fg))
+        box.pack_start(label, False, False, 0)
+
+    w = WIDTH * 8
+    popup_window.set_default_size(w, -1)
+    try:
+        from screeninfo import get_monitors
+        m = next(m for m in get_monitors() if m.is_primary)
+        popup_window.move(m.x + (m.width - w) // 2, m.y + 50)
+    except Exception:
+        popup_window.move(200, 50)
+
+    popup_window.show_all()
+    while Gtk.events_pending():
+        Gtk.main_iteration()
+
+def hide_popup():
+    global popup_window
+    if popup_window:
+        popup_window.destroy()
+        popup_window = None
+
+
 def print_item(title, ts, src, desc='', use_desc=False):
     """Print news item and optionally speak"""
     global last_spoken
@@ -681,11 +757,18 @@ def show_news(news_items):
     else:
         was_playing = False
 
+    if poll_mode and items:
+        show_popup(items)
+
     for item in items:
         title, ts, src = item[0], item[1], item[2]
         desc = item[3] if len(item) > 3 else ''
         use_desc = item[4] if len(item) > 4 else False
         print_item(title, ts, src, desc, use_desc)
+
+    if popup_window:
+        time.sleep(1)
+        hide_popup()
 
     if was_playing:
         time.sleep(0.5)
@@ -758,6 +841,19 @@ try:
                 mt_str = mt_str[2:]
             name = src.get('name', src.get('url', 'Unknown'))
             print(f"{name}: {dur_str} {len(items)} items {mt_str}")
+    elif args.test_popup:
+        items = [
+            ('שיגורים בודדים מאיראן: הדי פיצוצים בחיפה', '07:22', 'Ynet'),
+            ('פיקוד העורף: ניתן לצאת מהמרחבים המוגנים בצפון', '07:31', 'Ynet'),
+            ('Sources: Meta has paused its work with Mercor', '00:45', 'Techmeme'),
+            ('בעקבות נאום טראמפ: עלייה נוספת במחירי הנפט', '08:09', 'maariv'),
+        ]
+        show_popup(items)
+        import gi
+        gi.require_version('Gtk', '3.0')
+        from gi.repository import Gtk, GLib
+        GLib.timeout_add(5000, Gtk.main_quit)
+        Gtk.main()
     elif args.word_freq:
         import re
         from collections import Counter

@@ -69,6 +69,8 @@ parser.add_argument('--audio-active', action='store_true',
                     help='Check if audio playback is active')
 parser.add_argument('--no-tts', action='store_true',
                     help='Disable TTS')
+parser.add_argument('--word-freq', action='store_true',
+                    help='Show word frequencies across all sources')
 args = parser.parse_args()
 
 WIDTH = args.width if args.width else int(os.environ.get('MANWIDTH', 110))
@@ -743,10 +745,25 @@ try:
                 mt_str = mt_str[2:]
             name = src.get('name', src.get('url', 'Unknown'))
             print(f"{name}: {dur_str} {len(items)} items {mt_str}")
+    elif args.word_freq:
+        import re
+        from collections import Counter
+        words = Counter()
+        for src in enabled_sources:
+            status(src.get('name', src['url']))
+            for item in fetch_rss(src, limit=999999):
+                for w in re.findall(r'\w+', f"{item[1]} {item[4]}".lower()):
+                    if len(w) > 1:
+                        words[w] += 1
+        status()
+        for w, c in sorted(words.items(), key=lambda x: x[1]):
+            print(f"{c}\t{w}")
     elif poll_mode:
         # log_debug("Starting polling mode")
         while True:
-            # log_debug("=== Poll cycle start ===")
+            load_config(args.config)
+            if not args.url:
+                enabled_sources = [s for s in config.get('sources', []) if s.get('enabled', True)]
             news = fetch_news()
             if args.url and first_poll:
                 print_mean_time(news)

@@ -97,6 +97,17 @@ else:
     if not enabled_sources:
         enabled_sources = [{'url': 'https://rss.mivzakim.net/rss/category/1', 'name': 'Mivzakim', 'use_description': False}]
 
+if debug:
+    # Collect all block words: global + per-source
+    all_bw = list(BLOCK_WORDS)
+    for s in enabled_sources:
+        all_bw.extend(s.get('block_words', []))
+    bw = sorted({p.strip() for w in all_bw for p in w.split(',') if p.strip()})
+    if bw:
+        print("block_words:", file=sys.stderr)
+        for w in bw:
+            print(f"  {w}", file=sys.stderr)
+
 seen = deque(maxlen=10000)
 first_poll = True
 last_spoken = None
@@ -478,6 +489,8 @@ def fetch_rss(source_config, limit=None):
             block_words.extend([w.strip().lower() for w in word.split(',')])
         else:
             block_words.append(word.lower())
+    if block_words:
+        log_debug(f"{name} block: {', '.join(block_words)}")
 
     feed_items = root.xpath('//*[local-name()="item" or local-name()="entry"]')
     items = []
@@ -756,8 +769,9 @@ try:
                     if len(w) > 1:
                         words[w] += 1
         status()
+        total = sum(words.values())
         for w, c in sorted(words.items(), key=lambda x: x[1]):
-            print(f"{c}\t{w}")
+            print(f"{c}\t{c/total:.2e}\t{w}")
     elif poll_mode:
         # log_debug("Starting polling mode")
         while True:
@@ -773,7 +787,8 @@ try:
             status()
     else:
         log_debug("Running in normal mode")
-        os.system('clear')
+        if not debug:
+            os.system('clear')
         current_time = datetime.now().strftime('%H:%M')
         print(" " * 80, f"  {current_time}\n")
         news = fetch_news()

@@ -28,7 +28,7 @@ sources:
   - name: Ynet
     url: https://www.ynet.co.il/Integration/StoryRss1854.xml
     block_words:
-      - אזעקה במטולה
+      - מטולה, אצבע הגליל, משגב עם, אצבע הגליל, מרגליות, במנרה
   - name: ynet - דיגיטל
     url: https://www.ynet.co.il/Integration/StoryRss544.xml
   - name: The Decoder
@@ -59,4 +59,6 @@ settings:
   max_items: 10
   poll_interval: 60
   tts_volume_adjust: -10
-  block_words: []
+  block_words: [בצפון, בקריית שמונה, Верхней Галилее, сирены прозвучали на юге Израиля, יורט בהצלחה,
+    מד״א סורקים, לא דווח על
+    ]

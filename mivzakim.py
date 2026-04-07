@@ -585,21 +585,23 @@ def show_popup(items):
     global popup_window
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, Gdk
+    from gi.repository import Gtk
 
     hide_popup()
     if not items:
         return
 
     dark = is_dark_theme()
-    bg = Gdk.RGBA()
-    bg.parse("#222" if dark else "#f0f0f0")
+    bg = "#222" if dark else "#f0f0f0"
     fg = "#eee" if dark else "#111"
+
+    css = Gtk.CssProvider()
+    css.load_from_data(f"window {{ background-color: {bg}; }} label {{ color: {fg}; }}".encode())
 
     popup_window = Gtk.Window(title="News")
     popup_window.set_decorated(False)
     popup_window.set_keep_above(True)
-    popup_window.override_background_color(Gtk.StateFlags.NORMAL, bg)
+    popup_window.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
     box.set_margin_start(10)
@@ -613,7 +615,7 @@ def show_popup(items):
         label = Gtk.Label(label=text)
         label.set_xalign(1.0)
         label.set_line_wrap(True)
-        label.modify_fg(Gtk.StateFlags.NORMAL, Gdk.color_parse(fg))
+        label.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         box.pack_start(label, False, False, 0)
 
     w = WIDTH * 8

@@ -32,8 +32,18 @@ def load_config(path=None):
     if path is None:
         path = os.path.join(os.path.dirname(__file__), 'config.yaml')
     if os.path.exists(path):
-        with open(path) as f:
-            config = yaml.safe_load(f) or {}
+        try:
+            if '-d' in sys.argv or '--debug' in sys.argv:
+                print(f"Loading {path}", file=sys.stderr)
+            with open(path) as f:
+                config = yaml.safe_load(f) or {}
+        except yaml.YAMLError as e:
+            mark = getattr(e, 'problem_mark', None)
+            if mark:
+                print(f"config.yaml:{mark.line + 1}:{mark.column + 1} {e.problem}", file=sys.stderr)
+            else:
+                print(f"config.yaml: {e}", file=sys.stderr)
+            return
     else:
         config = {}
     s = config.get('settings', {})

@@ -33,7 +33,7 @@ def load_config(path=None):
         path = os.path.join(os.path.dirname(__file__), 'config.yaml')
     if os.path.exists(path):
         try:
-            if '-d' in sys.argv or '--debug' in sys.argv:
+            if args.debug:
                 print(f"Loading {path}", file=sys.stderr)
             with open(path) as f:
                 config = yaml.safe_load(f) or {}
@@ -55,8 +55,6 @@ def load_config(path=None):
 config = {}
 MAX_ITEMS = POLL_INTERVAL = TTS_VOLUME_ADJUST = 0
 BLOCK_WORDS = []
-load_config()
-
 # Parse arguments
 parser = argparse.ArgumentParser(description='Hebrew news reader')
 parser.add_argument('-p', '--poll', action='store_true',
@@ -87,11 +85,9 @@ args = parser.parse_args()
 
 WIDTH = args.width if args.width else int(os.environ.get('MANWIDTH', 110))
 
-if args.config:
-    load_config(args.config)
-
 poll_mode = args.poll
-debug = args.debug
+
+load_config(args.config)
 source_filter = args.source
 
 # Get sources from args or config
@@ -109,7 +105,7 @@ else:
     if not enabled_sources:
         enabled_sources = [{'url': 'https://rss.mivzakim.net/rss/category/1', 'name': 'Mivzakim', 'use_description': False}]
 
-if debug:
+if args.debug:
     # Collect all block words: global + per-source
     all_bw = list(BLOCK_WORDS)
     for s in enabled_sources:
@@ -173,7 +169,7 @@ def status(msg=''):
 
 def log_debug(msg):
     """Print debug message if debug mode enabled"""
-    if debug:
+    if args.debug:
         print(f"{msg}", file=sys.stderr)
 
 
@@ -931,7 +927,7 @@ try:
             status()
     else:
         log_debug("Running in normal mode")
-        if not debug:
+        if not args.debug:
             os.system('clear')
         current_time = datetime.now().strftime('%H:%M')
         print(" " * 80, f"  {current_time}\n")

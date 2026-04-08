@@ -856,7 +856,7 @@ try:
             print(f"{name}: {dur_str} {len(items)} items {mt_str}")
     elif args.test_popup:
         items = [
-            ('הראשון השני השלישי', '07:22', 'test'),
+            ('הראשון השני השלישי', '12:34', 'test'),
         ]
         show_popup(items)
         import gi

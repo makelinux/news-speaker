@@ -96,13 +96,13 @@ source_filter = args.source
 
 # Get sources from args or config
 if args.url:
-    # Look up configured name for URL
-    name = ''
+    # Look up configured source for URL, merge settings
+    src = {'url': args.url, 'name': '', 'use_description': args.use_description}
     for s in config.get('sources', []):
         if s.get('url') == args.url:
-            name = s.get('name', '')
+            src.update(s)
             break
-    enabled_sources = [{'url': args.url, 'name': name, 'use_description': args.use_description}]
+    enabled_sources = [src]
 else:
     sources = config.get('sources', [])
     enabled_sources = [s for s in sources if s.get('enabled', True)]
@@ -237,9 +237,8 @@ def list_html_links(url):
                     print(f"{text} - {link}")
 
         return True
-    except Exception as e:
-        print(f"Error fetching HTML: {e}", file=sys.stderr)
-        sys.exit(1)
+    except Exception:
+        return False
 
 
 def list_audio():
@@ -396,13 +395,35 @@ def fetch_rss(source_config, limit=None):
         return []
 
     headers = {'Accept': 'application/rss+xml, application/xml, text/xml, */*'}
+    cookies = {}
+    har = source_config.get('har')
+    if har:
+        har_path = os.path.join(os.path.dirname(__file__), har)
+        try:
+            with open(har_path) as f:
+                har_data = json.load(f)
+            for entry in har_data['log']['entries']:
+                if url in entry['request']['url']:
+                    for h in entry['request']['headers']:
+                        if not h['name'].startswith(':'):
+                            headers[h['name']] = h['value']
+                    for c in entry['request'].get('cookies', []):
+                        cookies[c['name']] = c['value']
+                    break
+        except Exception as e:
+            log_debug(f"HAR load failed: {e}")
+    if source_config.get('cookies'):
+        for pair in source_config['cookies'].split('; '):
+            if '=' in pair:
+                k, v = pair.split('=', 1)
+                cookies[k] = v
 
     # Retry up to 3 times on failure
     root = None
     content_len = 0
     for attempt in range(3):
         try:
-            response = session.get(url, timeout=30, headers=headers)
+            response = session.get(url, timeout=30, headers=headers, cookies=cookies)
             response.raise_for_status()
             content_len = len(response.content)
             parser = etree.XMLParser(recover=True)
@@ -423,7 +444,12 @@ def fetch_rss(source_config, limit=None):
                 log_debug(f"Attempt {attempt + 1} failed for {name}: {response.status_code}")
                 time.sleep(1)
             else:
-                print(f"{name}: {response.status_code} {response.reason}", file=sys.stderr)
+                msg = f"{name}: {response.status_code} {response.reason}"
+                if response.status_code == 403 and not har:
+                    from urllib.parse import urlparse
+                    host = urlparse(url).hostname
+                    msg += f", download HAR in browser, add to config: har: {host}.har"
+                print(msg, file=sys.stderr)
                 return []
         except requests.exceptions.ConnectionError as e:
             reason = getattr(e.args[0], 'reason', e) if e.args else e

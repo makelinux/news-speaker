@@ -54,6 +54,9 @@ sources:
     url: https://thenewstack.io/feed
   - name: RedHat Next
     url: https://next.redhat.com/feed/
+  - name: RedHat Dev
+    url: https://developers.redhat.com/blog/feed
+    har: developers.redhat.com.har
   - name: arXiv AI
     url: https://rss.arxiv.org/atom/cs.ai+cs.lg
 

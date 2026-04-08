@@ -1,4 +1,6 @@
 sources:
+  - name: axios
+    url: https://api.axios.com/feed/
   - name: maariv-tech
     url: https://www.maariv.co.il/rss/rssfeedstechnologeya
   - name: maariv

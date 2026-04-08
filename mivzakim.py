@@ -585,7 +585,7 @@ def show_popup(items):
     global popup_window
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk
+    from gi.repository import Gtk, Gdk
 
     hide_popup()
     if not items:
@@ -601,6 +601,8 @@ def show_popup(items):
     popup_window = Gtk.Window(title="News")
     popup_window.set_decorated(False)
     popup_window.set_keep_above(True)
+    popup_window.set_accept_focus(False)
+    popup_window.set_focus_on_map(False)
     popup_window.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -618,21 +620,9 @@ def show_popup(items):
         label.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         box.pack_start(label, False, False, 0)
 
-    w = WIDTH * 8
-    popup_window.set_default_size(w, -1)
-    try:
-        from screeninfo import get_monitors
-        m = next(m for m in get_monitors() if m.is_primary)
-        popup_window.move(m.x + (m.width - w) // 2, m.y + 50)
-    except Exception:
-        popup_window.move(200, 50)
-
+    popup_window.set_default_size(WIDTH * 8, -1)
     popup_window.show_all()
-    while Gtk.events_pending():
-        Gtk.main_iteration()
-    time.sleep(0.1)
-    while Gtk.events_pending():
-        Gtk.main_iteration()
+    flush_gtk()
 
 def flush_gtk():
     import gi
@@ -772,20 +762,35 @@ def show_news(news_items):
 
     if poll_mode and items:
         show_popup(items)
-
-    for item in items:
-        title, ts, src = item[0], item[1], item[2]
-        desc = item[3] if len(item) > 3 else ''
-        use_desc = item[4] if len(item) > 4 else False
-        print_item(title, ts, src, desc, use_desc)
-
-    if popup_window:
-        flush_gtk()
+        import threading
+        def _work():
+            for item in items:
+                title, ts, src = item[0], item[1], item[2]
+                desc = item[3] if len(item) > 3 else ''
+                use_desc = item[4] if len(item) > 4 else False
+                print_item(title, ts, src, desc, use_desc)
+            if was_playing:
+                time.sleep(0.5)
+                resume_media()
+            import gi
+            gi.require_version('Gtk', '3.0')
+            from gi.repository import GLib
+            GLib.idle_add(Gtk.main_quit)
+        import gi
+        gi.require_version('Gtk', '3.0')
+        from gi.repository import Gtk
+        threading.Thread(target=_work, daemon=True).start()
+        Gtk.main()
         hide_popup()
-
-    if was_playing:
-        time.sleep(0.5)
-        resume_media()
+    else:
+        for item in items:
+            title, ts, src = item[0], item[1], item[2]
+            desc = item[3] if len(item) > 3 else ''
+            use_desc = item[4] if len(item) > 4 else False
+            print_item(title, ts, src, desc, use_desc)
+        if was_playing:
+            time.sleep(0.5)
+            resume_media()
 
     first_poll = False
 

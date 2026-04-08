@@ -626,7 +626,7 @@ def _show_popup_tk(items, bg, fg):
     popup_window.configure(bg=bg)
 
     for title, ts, src, *_ in items:
-        text = get_display(f"{ts} - {title}  [{src}]")
+        text = get_display(title)
         label = tk.Label(popup_window, text=text, bg=bg, fg=fg,
                          anchor='e', justify='right',
                          font=('sans', 11), padx=10, pady=2)
@@ -663,7 +663,7 @@ def _show_popup_gtk(items, bg, fg):
     popup_window.add(box)
 
     for title, ts, src, *_ in items:
-        text = f"{ts} - {title}  [{src}]"
+        text = title
         label = Gtk.Label(label=text)
         label.set_xalign(1.0)
         label.set_line_wrap(True)

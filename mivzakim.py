@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from collections import deque
 
+import re
 from lxml import etree
 import requests
 from gtts import gTTS
@@ -28,7 +29,7 @@ session.headers.update({
 })
 
 def load_config(path=None):
-    global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, BLOCK_WORDS
+    global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, BLOCK_WORDS, REPLACE_RULES
     if path is None:
         path = os.path.join(os.path.dirname(__file__), 'config.yaml')
     if os.path.exists(path):
@@ -51,10 +52,13 @@ def load_config(path=None):
     POLL_INTERVAL = s.get('poll_interval', 60)
     TTS_VOLUME_ADJUST = s.get('tts_volume_adjust', -10)
     BLOCK_WORDS = s.get('block_words', [])
+    REPLACE_RULES = [(re.compile(r['pattern']), r.get('replace', ''))
+                     for r in s.get('replace', [])]
 
 config = {}
 MAX_ITEMS = POLL_INTERVAL = TTS_VOLUME_ADJUST = 0
 BLOCK_WORDS = []
+REPLACE_RULES = []
 # Parse arguments
 parser = argparse.ArgumentParser(description='Hebrew news reader')
 parser.add_argument('-p', '--poll', action='store_true',
@@ -497,6 +501,9 @@ def fetch_rss(source_config, limit=None):
             block_words.extend([w.strip().lower() for w in word.split(',')])
         else:
             block_words.append(word.lower())
+    src_replace = [(re.compile(r['pattern']), r.get('replace', ''))
+                    for r in source_config.get('replace', [])]
+    replace_rules = REPLACE_RULES + src_replace
     if block_words:
         log_debug(f"{name} block: {', '.join(block_words)}")
 
@@ -540,6 +547,8 @@ def fetch_rss(source_config, limit=None):
             if any(word in text for word in block_words):
                 continue
 
+            for pat, repl in replace_rules:
+                title_text = pat.sub(repl, title_text)
             try:
                 dt = parse_datetime(dt_str)
                 key = guid_text or title_text

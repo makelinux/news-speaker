@@ -580,13 +580,11 @@ def is_dark_theme():
         pass
     return False
 
-def show_popup(items):
-    """Show news items in a topmost GTK popup window"""
-    global popup_window
-    import gi
-    gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, Gdk
+popup_backend = None  # 'tk' or 'gtk'
 
+def show_popup(items):
+    """Show news items in a topmost popup window (tkinter or GTK fallback)"""
+    global popup_window, popup_backend
     hide_popup()
     if not items:
         return
@@ -594,6 +592,43 @@ def show_popup(items):
     dark = is_dark_theme()
     bg = "#222" if dark else "#f0f0f0"
     fg = "#eee" if dark else "#111"
+
+    try:
+        _show_popup_tk(items, bg, fg)
+        popup_backend = 'tk'
+    except Exception:
+        _show_popup_gtk(items, bg, fg)
+        popup_backend = 'gtk'
+
+def _show_popup_tk(items, bg, fg):
+    global popup_window
+    import tkinter as tk
+    from bidi.algorithm import get_display
+    popup_window = tk.Tk()
+    popup_window.title("News")
+    popup_window.overrideredirect(True)
+    popup_window.attributes('-topmost', True)
+    popup_window.configure(bg=bg)
+
+    for title, ts, src, *_ in items:
+        text = get_display(f"{ts} - {title}  [{src}]")
+        label = tk.Label(popup_window, text=text, bg=bg, fg=fg,
+                         anchor='e', justify='right', wraplength=WIDTH * 7,
+                         font=('sans', 11), padx=10, pady=2)
+        label.pack(fill='x')
+
+    popup_window.update_idletasks()
+    w = popup_window.winfo_reqwidth()
+    h = popup_window.winfo_reqheight()
+    sw = popup_window.winfo_screenwidth()
+    popup_window.geometry(f"{w}x{h}+{(sw - w) // 2}+10")
+    popup_window.update()
+
+def _show_popup_gtk(items, bg, fg):
+    global popup_window
+    import gi
+    gi.require_version('Gtk', '3.0')
+    from gi.repository import Gtk
 
     css = Gtk.CssProvider()
     css.load_from_data(f"window {{ background-color: {bg}; }} label {{ color: {fg}; }}".encode())
@@ -622,21 +657,21 @@ def show_popup(items):
 
     popup_window.set_default_size(WIDTH * 8, -1)
     popup_window.show_all()
-    flush_gtk()
-
-def flush_gtk():
-    import gi
-    gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk
     while Gtk.events_pending():
         Gtk.main_iteration()
 
 def hide_popup():
-    global popup_window
+    global popup_window, popup_backend
     if popup_window:
         popup_window.destroy()
+        if popup_backend == 'gtk':
+            import gi
+            gi.require_version('Gtk', '3.0')
+            from gi.repository import Gtk
+            while Gtk.events_pending():
+                Gtk.main_iteration()
         popup_window = None
-        flush_gtk()
+        popup_backend = None
 
 
 def print_item(title, ts, src, desc='', use_desc=False):
@@ -762,35 +797,19 @@ def show_news(news_items):
 
     if poll_mode and items:
         show_popup(items)
-        import threading
-        def _work():
-            for item in items:
-                title, ts, src = item[0], item[1], item[2]
-                desc = item[3] if len(item) > 3 else ''
-                use_desc = item[4] if len(item) > 4 else False
-                print_item(title, ts, src, desc, use_desc)
-            if was_playing:
-                time.sleep(0.5)
-                resume_media()
-            import gi
-            gi.require_version('Gtk', '3.0')
-            from gi.repository import GLib
-            GLib.idle_add(Gtk.main_quit)
-        import gi
-        gi.require_version('Gtk', '3.0')
-        from gi.repository import Gtk
-        threading.Thread(target=_work, daemon=True).start()
-        Gtk.main()
+
+    for item in items:
+        title, ts, src = item[0], item[1], item[2]
+        desc = item[3] if len(item) > 3 else ''
+        use_desc = item[4] if len(item) > 4 else False
+        print_item(title, ts, src, desc, use_desc)
+
+    if popup_window:
         hide_popup()
-    else:
-        for item in items:
-            title, ts, src = item[0], item[1], item[2]
-            desc = item[3] if len(item) > 3 else ''
-            use_desc = item[4] if len(item) > 4 else False
-            print_item(title, ts, src, desc, use_desc)
-        if was_playing:
-            time.sleep(0.5)
-            resume_media()
+
+    if was_playing:
+        time.sleep(0.5)
+        resume_media()
 
     first_poll = False
 
@@ -864,11 +883,15 @@ try:
             ('הראשון השני השלישי', '12:34', 'test'),
         ]
         show_popup(items)
-        import gi
-        gi.require_version('Gtk', '3.0')
-        from gi.repository import Gtk, GLib
-        GLib.timeout_add(5000, Gtk.main_quit)
-        Gtk.main()
+        if popup_backend == 'gtk':
+            import gi
+            gi.require_version('Gtk', '3.0')
+            from gi.repository import Gtk, GLib
+            GLib.timeout_add(5000, Gtk.main_quit)
+            Gtk.main()
+        else:
+            time.sleep(5)
+        hide_popup()
     elif args.word_freq:
         import re
         from collections import Counter

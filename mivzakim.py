@@ -623,7 +623,7 @@ def _show_popup_tk(items, bg, fg):
     for title, ts, src, *_ in items:
         text = get_display(f"{ts} - {title}  [{src}]")
         label = tk.Label(popup_window, text=text, bg=bg, fg=fg,
-                         anchor='e', justify='right', wraplength=WIDTH * 7,
+                         anchor='e', justify='right',
                          font=('sans', 11), padx=10, pady=2)
         label.pack(fill='x')
 

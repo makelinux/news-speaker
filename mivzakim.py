@@ -655,7 +655,7 @@ def _show_popup_tk(items, bg, fg):
         text = get_display(title)
         label = tk.Label(popup_window, text=text, bg=bg, fg=fg,
                          anchor='e', justify='right',
-                         font=('sans', 11), padx=10, pady=2)
+                         font=('sans', 11), padx=15, pady=5)
         label.pack(fill='x')
 
     popup_window.update_idletasks()
@@ -663,6 +663,8 @@ def _show_popup_tk(items, bg, fg):
     h = popup_window.winfo_reqheight()
     sw = popup_window.winfo_screenwidth()
     popup_window.geometry(f"{w}x{h}+{(sw - w) // 2}+10")
+    popup_window.wait_visibility()
+    popup_window.attributes('-alpha', 0.92)
     popup_window.update()
 
 def _show_popup_gtk(items, bg, fg):
@@ -836,16 +838,15 @@ def show_news(news_items):
     else:
         was_playing = False
 
-    if poll_mode and items:
-        show_popup(items)
-
     for item in items:
         title, ts, src = item[0], item[1], item[2]
         desc = item[3] if len(item) > 3 else ''
         use_desc = item[4] if len(item) > 4 else False
+        if poll_mode:
+            show_popup([(title, ts, src)])
         print_item(title, ts, src, desc, use_desc)
-
-    if popup_window:
+        if poll_mode and not tts_items:
+            time.sleep(max(3, len(title) * 0.15))
         hide_popup()
 
     if was_playing:

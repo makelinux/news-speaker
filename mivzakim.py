@@ -843,6 +843,7 @@ def show_news(news_items):
         print_item(title, ts, src, desc, use_desc)
         if poll_mode and not tts_items:
             time.sleep(max(3, len(title) * 0.15))
+        time.sleep(1)
         hide_popup()
 
     if was_playing:

@@ -721,10 +721,6 @@ def print_item(title, ts, src, desc='', use_desc=False):
     """Print news item and optionally speak"""
     global last_spoken
 
-    # Strip trailing text in parentheses
-    import re
-    title = re.sub(r'\s*\([^)]+\)\s*$', '', title)
-
     # Decode HTML entities in title
     title = html_lib.unescape(title)
 

@@ -70,3 +70,4 @@ settings:
     ]
   replace:
     - pattern: '^\w+: '
+    - pattern: '\s*\([^)]+\)\s*$'

@@ -362,30 +362,67 @@ def resume_media():
         pass
 
 
+def _play_audio(audio):
+    audio += TTS_VOLUME_ADJUST
+    with pasimple.PaSimple(
+        pasimple.PA_STREAM_PLAYBACK,
+        pasimple.PA_SAMPLE_S16LE,
+        audio.channels,
+        audio.frame_rate,
+        app_name="news-app",
+        stream_name="playback",
+    ) as pa:
+        pa.write(audio.raw_data)
+        pa.drain()
+
+def _speak_gemini(text):
+    from google import genai
+    from google.genai import types
+    import wave
+    c = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+    r = c.models.generate_content(
+        model="gemini-3.1-flash-tts-preview",
+        contents=text,
+        config=types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                        voice_name="Kore"
+                    )
+                )
+            )
+        )
+    )
+    data = r.candidates[0].content.parts[0].inline_data.data
+    buf = BytesIO(data)
+    # Gemini returns raw PCM 24kHz 16-bit mono
+    audio = AudioSegment(data=data, sample_width=2, frame_rate=24000, channels=1)
+    _play_audio(audio)
+
+def _speak_gtts(lang, text):
+    if lang == 'he':
+        lang = 'iw'
+    tts = gTTS(text, lang=lang)
+    buf = BytesIO()
+    tts.write_to_fp(buf)
+    buf.seek(0)
+    audio = AudioSegment.from_mp3(buf)
+    buf.close()
+    _play_audio(audio)
+
 def speak_text(lang, text):
-    """Speak text using gTTS"""
     try:
-        if lang == 'he':
-            lang = 'iw'
         log_debug(f"TTS: {text[:50]}... (lang: {lang})")
-        tts = gTTS(text, lang=lang)
-        buf = BytesIO()
-        tts.write_to_fp(buf)
-        buf.seek(0)
-        audio = AudioSegment.from_mp3(buf)
-        buf.close()
-        audio += TTS_VOLUME_ADJUST
-        with pasimple.PaSimple(
-            pasimple.PA_STREAM_PLAYBACK,
-            pasimple.PA_SAMPLE_S16LE,
-            audio.channels,
-            audio.frame_rate,
-            app_name="news-app",
-            stream_name="playback",
-        ) as pa:
-            pa.write(audio.raw_data)
-            pa.drain()
-        log_debug("TTS completed")
+        if os.environ.get("GOOGLE_API_KEY"):
+            try:
+                _speak_gemini(text)
+                log_debug("TTS completed (Gemini)")
+                return
+            except Exception as e:
+                log_debug(f"Gemini TTS failed: {e}, falling back to gTTS")
+        _speak_gtts(lang, text)
+        log_debug("TTS completed (gTTS)")
     except Exception as e:
         print(f"TTS error: {e}", file=sys.stderr)
 

@@ -134,15 +134,21 @@ def load_backoff():
     try:
         with open(BACKOFF_FILE) as f:
             saved = json.load(f)
-        for url, delay in saved.items():
-            backoff[url] = {'skip_until': time.time() + delay, 'delay': delay, 'from_file': True}
+        for url, s in saved.items():
+            if isinstance(s, dict):
+                s['from_file'] = True
+                s['skip_until'] = min(s['skip_until'], time.time() + s['delay'])
+                backoff[url] = s
+            else:
+                backoff[url] = {'skip_until': time.time() + s, 'delay': s, 'from_file': True}
     except (FileNotFoundError, json.JSONDecodeError):
         pass
 
 def save_backoff():
     # Don't save min_interval entries - they're in config
     min_urls = {s['url'] for s in config.get('sources', []) if s.get('min_interval')}
-    saved = {url: s['delay'] for url, s in backoff.items()
+    saved = {url: {'skip_until': s['skip_until'], 'delay': s['delay']}
+             for url, s in backoff.items()
              if s['delay'] > BASE_DELAY and url not in min_urls}
     try:
         with open(BACKOFF_FILE, 'w') as f:
@@ -430,7 +436,7 @@ def fetch_rss(source_config, limit=None):
             root = etree.fromstring(response.content, parser)
             break
         except requests.exceptions.HTTPError as e:
-            if response.status_code == 429:
+            if response.status_code in (429,) or response.status_code >= 500:
                 if url not in backoff:
                     backoff[url] = {'skip_until': 0, 'delay': BASE_DELAY}
                 backoff[url]['delay'] = min(backoff[url]['delay'] * 2, 86400)
@@ -438,7 +444,8 @@ def fetch_rss(source_config, limit=None):
                 save_backoff()
                 d = backoff[url]['delay']
                 t = f"{d // 3600}h" if d >= 3600 else f"{d // 60}m" if d >= 60 else f"{d}s"
-                print(f"{name}: 429 too many requests, backing off {t}", file=sys.stderr)
+                status()
+                print(f"{name}: {response.status_code} {response.reason}, backing off {t}", file=sys.stderr)
                 return []
             if attempt < 2:
                 log_debug(f"Attempt {attempt + 1} failed for {name}: {response.status_code}")
@@ -449,9 +456,10 @@ def fetch_rss(source_config, limit=None):
                     from urllib.parse import urlparse
                     host = urlparse(url).hostname
                     msg += f", download HAR in browser, add to config: har: {host}.har"
+                status()
                 print(msg, file=sys.stderr)
                 return []
-        except requests.exceptions.ConnectionError as e:
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
             reason = getattr(e.args[0], 'reason', e) if e.args else e
             if not check_network():
                 # General network failure, don't penalize this source
@@ -465,6 +473,7 @@ def fetch_rss(source_config, limit=None):
             save_backoff()
             d = backoff[url]['delay']
             t = f"{d // 3600}h" if d >= 3600 else f"{d // 60}m" if d >= 60 else f"{d}s"
+            status()
             print(f"{name}: {type(reason).__name__}, backing off {t}", file=sys.stderr)
             return []
         except Exception as e:
@@ -472,6 +481,7 @@ def fetch_rss(source_config, limit=None):
                 log_debug(f"Attempt {attempt + 1} failed for {name}: {e}, retrying...")
                 time.sleep(1)
             else:
+                status()
                 print(f"{name}: {e}", file=sys.stderr)
                 return []
 

@@ -327,20 +327,19 @@ def is_audio_active():
     return False
 
 
-def pause_media():
-    """Pause media playback if playing, return True if was playing"""
+def is_media_playing():
     try:
-        result = subprocess.run(['playerctl', 'status'],
-                                capture_output=True, text=True, timeout=1)
-        if result.returncode == 0:
-            status = result.stdout.strip()
-            log_debug(f"Media status: {status}")
-            if status == 'Playing':
-                os.system('playerctl pause 2>/dev/null')
-                log_debug("Paused media playback")
-                return True
-    except Exception as e:
-        log_debug(f"Media check failed: {e}")
+        r = subprocess.run(['playerctl', 'status'],
+                           capture_output=True, text=True, timeout=1)
+        return r.returncode == 0 and r.stdout.strip() == 'Playing'
+    except Exception:
+        return False
+
+def pause_media():
+    if is_media_playing():
+        os.system('playerctl pause 2>/dev/null')
+        log_debug("Paused media playback")
+        return True
     return False
 
 
@@ -837,12 +836,14 @@ def show_news(news_items):
 
     # Pause media once before speaking all items
     tts_items = poll_mode and not args.no_tts and items
+    was_playing = False
     if tts_items and not is_microphone_active():
         was_playing = pause_media()
         if was_playing:
             time.sleep(0.5)
-    else:
-        was_playing = False
+            if is_media_playing():
+                log_debug("Media still playing after pause, skipping TTS")
+                tts_items = False
 
     for item in items:
         title, ts, src = item[0], item[1], item[2]

@@ -51,7 +51,17 @@ def load_config(path=None):
     MAX_ITEMS = s.get('max_items', 10)
     POLL_INTERVAL = s.get('poll_interval', 60)
     TTS_VOLUME_ADJUST = s.get('tts_volume_adjust', -10)
-    BLOCK_WORDS = s.get('block_words', [])
+    bwf = s.get('block_words_file')
+    if bwf:
+        p = os.path.expanduser(bwf) if bwf.startswith('~') else os.path.join(os.path.dirname(__file__), bwf)
+        try:
+            with open(p) as f:
+                BLOCK_WORDS = [line.strip() for line in f if line.strip()]
+        except FileNotFoundError:
+            print(f"{bwf}: not found", file=sys.stderr)
+            BLOCK_WORDS = []
+    else:
+        BLOCK_WORDS = s.get('block_words', [])
     REPLACE_RULES = [(re.compile(r['pattern']), r.get('replace', ''))
                      for r in s.get('replace', [])]
 

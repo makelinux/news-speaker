@@ -754,21 +754,25 @@ def print_item(title, ts, src, desc='', use_desc=False):
         lang = 'he'
 
     line = f"{ts} - {title}"
+    from math import ceil
+    w = WIDTH - 8
+    if len(line) > w:
+        w = len(line) // ceil(len(line) / w) + 10
     log_debug(f"WIDTH={WIDTH}")
     if lang == 'he':
-        wrapped_lines = textwrap.wrap(line, width=WIDTH-8)
+        wrapped_lines = textwrap.wrap(line, width=w)
         log_debug(f"lines={len(wrapped_lines)}")
         for i, wrapped_line in enumerate(wrapped_lines):
-            w = WIDTH - 8 if i > 0 else WIDTH
             log_debug(f"{wrapped_line}")
-            print(format_rtl_text(wrapped_line, w))
+            lw = WIDTH if i == 0 else WIDTH - 8
+            print(format_rtl_text(wrapped_line, lw))
 
         if desc and use_desc:
             wrapped = textwrap.fill(desc, width=WIDTH-38, initial_indent=8*' ', subsequent_indent=8*' ')
             print(f"\n{wrapped}")
         print(8*' ' + f"{src}")
     else:
-        print(textwrap.fill(line, width=WIDTH-8, subsequent_indent=8*' '))
+        print(textwrap.fill(line, width=w, subsequent_indent=8*' '))
 
         if desc and use_desc:
             wrapped = textwrap.fill(desc, width=WIDTH-38, initial_indent=8*' ', subsequent_indent=8*' ')

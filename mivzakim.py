@@ -29,7 +29,7 @@ session.headers.update({
 })
 
 def load_config(path=None):
-    global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, BLOCK_WORDS, REPLACE_RULES
+    global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, TTS_VOICES, BLOCK_WORDS, REPLACE_RULES
     if path is None:
         path = os.path.join(os.path.dirname(__file__), 'config.yaml')
     if os.path.exists(path):
@@ -51,6 +51,7 @@ def load_config(path=None):
     MAX_ITEMS = s.get('max_items', 10)
     POLL_INTERVAL = s.get('poll_interval', 60)
     TTS_VOLUME_ADJUST = s.get('tts_volume_adjust', -10)
+    TTS_VOICES = s.get('tts_voices', [])
     bwf = s.get('block_words_file')
     if bwf:
         p = os.path.expanduser(bwf) if bwf.startswith('~') else os.path.join(os.path.dirname(__file__), bwf)
@@ -67,6 +68,7 @@ def load_config(path=None):
 
 config = {}
 MAX_ITEMS = POLL_INTERVAL = TTS_VOLUME_ADJUST = 0
+TTS_VOICES = []
 BLOCK_WORDS = []
 REPLACE_RULES = []
 # Parse arguments
@@ -375,10 +377,14 @@ def _play_audio(audio):
         pa.write(audio.raw_data)
         pa.drain()
 
+import random
+
 def _speak_gemini(text):
     from google import genai
     from google.genai import types
-    import wave
+    voice = random.choice(TTS_VOICES) if TTS_VOICES else 'Kore'
+    log_debug(f"Gemini voice: {voice}")
+    print(f"  {voice}", file=sys.stderr)
     c = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     r = c.models.generate_content(
         model="gemini-3.1-flash-tts-preview",
@@ -388,15 +394,13 @@ def _speak_gemini(text):
             speech_config=types.SpeechConfig(
                 voice_config=types.VoiceConfig(
                     prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name="Kore"
+                        voice_name=voice
                     )
                 )
             )
         )
     )
     data = r.candidates[0].content.parts[0].inline_data.data
-    buf = BytesIO(data)
-    # Gemini returns raw PCM 24kHz 16-bit mono
     audio = AudioSegment(data=data, sample_width=2, frame_rate=24000, channels=1)
     _play_audio(audio)
 

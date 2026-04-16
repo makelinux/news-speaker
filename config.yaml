@@ -66,6 +66,13 @@ settings:
   poll_interval: 60
   tts_volume_adjust: -10
   block_words_file: ~/cmnd/block_words.txt
+  tts_voices: [Achernar, Achird, Algenib, Algieba, Alnilam,
+    Aoede, Autonoe, Callirrhoe, Charon, Despina,
+    Enceladus, Erinome, Fenrir, Gacrux, Iapetus,
+    Kore, Laomedeia, Leda, Orus, Puck,
+    Pulcherrima, Rasalgethi, Sadachbia, Sadaltager,
+    Schedar, Sulafat, Umbriel, Vindemiatrix, Zephyr,
+    Zubenelgenubi]
   replace:
     - pattern: '^\w+: '
     - pattern: '\s*\([^)]+\)\s*$'

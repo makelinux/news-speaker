@@ -884,8 +884,9 @@ def show_news(news_items):
         if source_filter and source_filter not in src:
             continue
         if poll_mode and first_poll:
-            # Mark all as seen, don't display
             seen.append(key)
+            if i == 0:
+                items.insert(0, (title_text, parse_time(dt_str), src, desc, use_desc))
         else:
             # Normal mode or subsequent polls
             if key not in seen:

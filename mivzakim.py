@@ -660,12 +660,21 @@ def _show_popup_tk(items, bg, fg):
     popup_window.attributes('-topmost', True)
     popup_window.configure(bg=bg)
 
+    from math import ceil
+    import tkinter.font as tkfont
+    f = tkfont.Font(family='sans', size=11)
+
+    mw = WIDTH * f.measure('m')
     for title, ts, src, *_ in items:
-        text = get_display(title)
-        label = tk.Label(popup_window, text=text, bg=bg, fg=fg,
-                         anchor='e', justify='right',
-                         font=('sans', 11), padx=15, pady=5)
-        label.pack(fill='x')
+        tw = f.measure(get_display(title))
+        if any('\u0590' <= c <= '\u05FF' for c in title):
+            d = dict(anchor='e', justify='right')
+        else:
+            d = dict(anchor='w', justify='left')
+        d.update(bg=bg, fg=fg, font=('sans', 11), padx=15, pady=5)
+        d['text'] = get_display(title)
+        d['wraplength'] = tw // ceil(tw / mw) + f.measure('m') * 5 if tw > mw else 0
+        tk.Label(popup_window, **d).pack(fill='x')
 
     popup_window.update_idletasks()
     w = popup_window.winfo_reqwidth()
@@ -931,6 +940,8 @@ try:
     elif args.test_popup:
         items = [
             ('הראשון השני השלישי', '12:34', 'test'),
+            (' '.join(f'word{i}' for i in range(20)), '12:34', 'test'),
+            (' '.join(f'word{i}' for i in range(30)), '13:00', 'test'),
         ]
         show_popup(items)
         if popup_backend == 'gtk':

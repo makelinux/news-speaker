@@ -1,71 +1,48 @@
 sources:
   - name: axios
     url: https://api.axios.com/feed/
-  - name: maariv-tech
-    url: https://www.maariv.co.il/rss/rssfeedstechnologeya
-  - name: maariv
-    url: https://www.maariv.co.il/rss/rssfeedsmivzakichadashot
-    enabled: false
-    block_words:
-      - האח הגדול, ממש לא
-  - name: phoronix
-    url: https://www.phoronix.com/rss.php
-  - name: newsru
-    url: https://www.newsru.co.il/il/www/news/big
-    block_words:
-      - футбол, дзюдо, гран-при, чемпионат, прыжки с шестом
-  - name: Techmeme
+  - name: techmeme
     url: https://www.techmeme.com/feed.xml
-    #enabled: false
-  - name: Mivzakim
-    url: https://rss.mivzakim.net/rss/category/1
-    source_filter: Ynet  # Filter by source name (e.g., "N12"), null for all sources
-    enabled: false
   - name: The Register AI
     url: https://www.theregister.com/software/ai_ml/headlines.atom
-  - name: AI News
+  - name: ai news
     url: https://www.artificialintelligence-news.com/feed/
-  - name: Wired
-    url: https://www.wired.com/feed/tag/ai/latest/rss
-    enabled: false
-  - name: Ynet
-    url: https://www.ynet.co.il/Integration/StoryRss1854.xml
-    block_words:
-      - מטולה, אצבע הגליל, משגב עם, אצבע הגליל, מרגליות, במנרה
-  - name: ynet - דיגיטל
-    url: https://www.ynet.co.il/Integration/StoryRss544.xml
-  - name: The Decoder
+  - name: the decoder
     url: https://the-decoder.com/feed/
-  - name: Guardian AI
+  - name: guardian ai
     url: https://www.theguardian.com/technology/artificialintelligenceai/rss
-  - name: The Next Web Neural
+  - name: the next web neural
     url: https://thenextweb.com/neural/feed
-  - name: HackerNoon AI
+  - name: hackernoon ai
     url: https://hackernoon.com/tagged/ai/feed
     min_interval: 3600
-    #enabled: false
-  - name: SiliconAngle AI
+  - name: siliconangle ai
     url: https://siliconangle.com/category/ai/feed
-  - name: Futurism AI
+  - name: futurism ai
     url: https://futurism.com/categories/ai-artificial-intelligence/feed
-  - name: Phys.org ML
-    url: https://phys.org/rss-feed/technology-news/machine-learning-ai/
-    enabled: false
-  - name: The New Stack
+  - name: the new stack
     url: https://thenewstack.io/feed
-  - name: RedHat Next
+  - name: nvidia
+    url: https://blogs.nvidia.com/feed/
+  - name: redhat next
     url: https://next.redhat.com/feed/
-  - name: RedHat Dev
+  - name: redhat dev
     url: https://developers.redhat.com/blog/feed
     har: developers.redhat.com.har
-  - name: arXiv AI
+    #enabled: false
+  - name: arxiv ai
     url: https://rss.arxiv.org/atom/cs.ai+cs.lg
+  - name: wired
+    url: https://www.wired.com/feed/tag/ai/latest/rss
+    enabled: false
+  - name: phys.org ml
+    url: https://phys.org/rss-feed/technology-news/machine-learning-ai/
+    enabled: false
 
 settings:
   max_items: 10
   poll_interval: 60
   tts_volume_adjust: -10
-  block_words_file: ~/cmnd/block_words.txt
   tts_voices: [Achernar, Achird, Algenib, Algieba, Alnilam,
     Aoede, Autonoe, Callirrhoe, Charon, Despina,
     Enceladus, Erinome, Fenrir, Gacrux, Iapetus,

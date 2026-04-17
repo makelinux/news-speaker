@@ -57,7 +57,7 @@ def _deep_merge(base, override):
             base[k] = v
 
 def load_config(path=None):
-    global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, TTS_VOICES, BLOCK_WORDS, REPLACE_RULES
+    global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, TTS_VOICES, TTS_PIPER_MODEL, BLOCK_WORDS, REPLACE_RULES
     global_path = os.path.expanduser('~/.config/news-reader/config.yaml')
     local_path = path or os.path.join(os.path.dirname(__file__), 'config.yaml')
     config = _load_yaml(global_path)
@@ -67,6 +67,7 @@ def load_config(path=None):
     POLL_INTERVAL = s.get('poll_interval', 60)
     TTS_VOLUME_ADJUST = s.get('tts_volume_adjust', -10)
     TTS_VOICES = s.get('tts_voices', [])
+    TTS_PIPER_MODEL = s.get('tts_piper_model', '')
     bwf = s.get('block_words_file')
     if bwf:
         p = os.path.expanduser(bwf) if bwf.startswith('~') else os.path.join(os.path.dirname(__file__), bwf)
@@ -84,6 +85,7 @@ def load_config(path=None):
 config = {}
 MAX_ITEMS = POLL_INTERVAL = TTS_VOLUME_ADJUST = 0
 TTS_VOICES = []
+TTS_PIPER_MODEL = ''
 BLOCK_WORDS = []
 REPLACE_RULES = []
 # Parse arguments
@@ -420,6 +422,20 @@ def _speak_gemini(text):
     status()
     print(f"  {DIM}{voice}{RST}", file=sys.stderr)
 
+def _speak_piper(text):
+    model = os.path.expanduser(TTS_PIPER_MODEL)
+    status("TTS piper...")
+    r = subprocess.run(
+        ['piper', '--model', model, '--output-raw', '--length-scale', '1.3'],
+        input=text.encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.decode().strip())
+    audio = AudioSegment(data=r.stdout, sample_width=2, frame_rate=22050, channels=1)
+    _play_audio(audio)
+    status()
+    log_debug("TTS completed (piper)")
+
 def _speak_gtts(lang, text):
     if lang == 'he':
         lang = 'iw'
@@ -442,7 +458,13 @@ def speak_text(lang, text):
                 _speak_gemini(text)
                 return
             except Exception as e:
-                log_debug(f"Gemini TTS failed: {e}, falling back to gTTS")
+                log_debug(f"Gemini TTS failed: {e}")
+        if TTS_PIPER_MODEL and lang == 'en':
+            try:
+                _speak_piper(text)
+                return
+            except Exception as e:
+                log_debug(f"Piper TTS failed: {e}")
         _speak_gtts(lang, text)
     except Exception as e:
         print(f"TTS error: {e}", file=sys.stderr)
@@ -935,9 +957,12 @@ def show_news(news_items):
         if poll_mode:
             show_popup([(title, ts, src)])
         print_item(title, ts, src, desc, use_desc)
+        if poll_mode:
+            time.sleep(1)
         if poll_mode and not tts_items:
             time.sleep(max(3, len(title) * 0.15))
-        time.sleep(1)
+        if poll_mode:
+            time.sleep(1)
         hide_popup()
 
     if was_playing:

@@ -28,25 +28,37 @@ session.headers.update({
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0',
 })
 
+def _load_yaml(path):
+    if not os.path.exists(path):
+        return {}
+    try:
+        if args.debug:
+            print(f"Loading {path}", file=sys.stderr)
+        with open(path) as f:
+            return yaml.safe_load(f) or {}
+    except yaml.YAMLError as e:
+        mark = getattr(e, 'problem_mark', None)
+        if mark:
+            print(f"{path}:{mark.line + 1}:{mark.column + 1} {e.problem}", file=sys.stderr)
+        else:
+            print(f"{path}: {e}", file=sys.stderr)
+        return {}
+
+def _deep_merge(base, override):
+    for k, v in override.items():
+        if k in base and isinstance(base[k], dict) and isinstance(v, dict):
+            _deep_merge(base[k], v)
+        elif k in base and isinstance(base[k], list) and isinstance(v, list):
+            base[k] = base[k] + v
+        else:
+            base[k] = v
+
 def load_config(path=None):
     global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, TTS_VOICES, BLOCK_WORDS, REPLACE_RULES
-    if path is None:
-        path = os.path.join(os.path.dirname(__file__), 'config.yaml')
-    if os.path.exists(path):
-        try:
-            if args.debug:
-                print(f"Loading {path}", file=sys.stderr)
-            with open(path) as f:
-                config = yaml.safe_load(f) or {}
-        except yaml.YAMLError as e:
-            mark = getattr(e, 'problem_mark', None)
-            if mark:
-                print(f"config.yaml:{mark.line + 1}:{mark.column + 1} {e.problem}", file=sys.stderr)
-            else:
-                print(f"config.yaml: {e}", file=sys.stderr)
-            return
-    else:
-        config = {}
+    global_path = os.path.expanduser('~/.config/news-reader/config.yaml')
+    local_path = path or os.path.join(os.path.dirname(__file__), 'config.yaml')
+    config = _load_yaml(global_path)
+    _deep_merge(config, _load_yaml(local_path))
     s = config.get('settings', {})
     MAX_ITEMS = s.get('max_items', 10)
     POLL_INTERVAL = s.get('poll_interval', 60)
@@ -383,9 +395,8 @@ def _speak_gemini(text):
     from google import genai
     from google.genai import types
     voice = random.choice(TTS_VOICES) if TTS_VOICES else 'Kore'
-    log_debug(f"Gemini voice: {voice}")
-    print(f"  {voice}", file=sys.stderr)
-    c = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+    status(f"TTS {voice}")
+    c = genai.Client()
     r = c.models.generate_content(
         model="gemini-3.1-flash-tts-preview",
         contents=text,
@@ -403,10 +414,13 @@ def _speak_gemini(text):
     data = r.candidates[0].content.parts[0].inline_data.data
     audio = AudioSegment(data=data, sample_width=2, frame_rate=24000, channels=1)
     _play_audio(audio)
+    status()
+    print(f"  {voice}", file=sys.stderr)
 
 def _speak_gtts(lang, text):
     if lang == 'he':
         lang = 'iw'
+    status("TTS gTTS...")
     tts = gTTS(text, lang=lang)
     buf = BytesIO()
     tts.write_to_fp(buf)

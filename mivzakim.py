@@ -21,7 +21,7 @@ import pasimple
 from langdetect import detect
 import yaml
 
-from hebrew_format import format_rtl_text
+from rtl_format import format_rtl_text, is_rtl, RTL_LANGS
 
 DIM = "\033[90m"
 RST = "\033[0m"
@@ -758,7 +758,7 @@ def _show_popup_tk(items, bg, fg):
     mw = WIDTH * f.measure('m')
     for title, ts, src, *_ in items:
         tw = f.measure(get_display(title))
-        if any('\u0590' <= c <= '\u05FF' for c in title):
+        if is_rtl(title):
             d = dict(anchor='e', justify='right')
         else:
             d = dict(anchor='w', justify='left')
@@ -850,7 +850,7 @@ def print_item(title, ts, src, desc='', use_desc=False):
     if len(line) > w:
         w = len(line) // ceil(len(line) / w) + 10
     log_debug(f"WIDTH={WIDTH}")
-    if lang == 'he':
+    if lang in RTL_LANGS or is_rtl(title):
         wrapped_lines = textwrap.wrap(line, width=w)
         log_debug(f"lines={len(wrapped_lines)}")
         for i, wrapped_line in enumerate(wrapped_lines):

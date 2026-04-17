@@ -70,11 +70,13 @@ Word frequency analysis:
 ## Features
 
 - Multi-source RSS/Atom feed parsing
-- RTL formatting - proper Hebrew text alignment
-- TTS - reads news aloud, waits for audio silence
+- RTL formatting - proper alignment for Hebrew, Arabic, Persian, Urdu, Yiddish
+- TTS - Gemini 3.1 Flash (cloud) -> Piper (offline) -> gTTS fallback chain
 - Popup window - shows new items on screen
 - GUID-based deduplication - handles edited headlines
-- Per-source exponential backoff on 429/connection errors
+- HAR file support for bot-protected sources
+- Global + local config merge (~/.config/news-reader/ + local)
+- Per-source exponential backoff on 429/5xx/timeout errors
 - Network-aware backoff - skips penalty on general outages
 - Per-source `min_interval` config for rate-limited sources
 - Config hot-reload in polling mode
@@ -105,7 +107,8 @@ settings:
 ## Dependencies
 
 ```bash
-pip install lxml requests gtts pydub pasimple langdetect pyyaml screeninfo
+pip install lxml requests gtts pydub pasimple langdetect pyyaml screeninfo python-bidi
 ```
 
+Optional: `pip install google-genai` (Gemini TTS), `pip install piper-tts` (offline TTS)\
 System: playerctl (media pause/resume)

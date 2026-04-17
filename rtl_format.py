@@ -7,6 +7,11 @@ lri = '\u2067'  # Left-to-Right Isolate
 pdi = '\u2069'  # Pop Directional Isolate
 rlm = '\u200f'  # Right-to-Left Mark
 
+RTL_LANGS = {'he', 'ar', 'fa', 'ur', 'yi'}
+
+def is_rtl(text):
+    return any('\u0590' <= c <= '\u08FF' or '\uFB50' <= c <= '\uFDFF' or '\uFE70' <= c <= '\uFEFF' for c in text)
+
 
 def visible_len(s):
     """Calculate visible length of string with control chars"""

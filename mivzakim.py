@@ -428,19 +428,19 @@ def _speak_gtts(lang, text):
     audio = AudioSegment.from_mp3(buf)
     buf.close()
     _play_audio(audio)
+    status()
+    log_debug("TTS completed (gTTS)")
 
 def speak_text(lang, text):
     try:
         log_debug(f"TTS: {text[:50]}... (lang: {lang})")
-        if os.environ.get("GOOGLE_API_KEY"):
+        if TTS_VOICES:
             try:
                 _speak_gemini(text)
-                log_debug("TTS completed (Gemini)")
                 return
             except Exception as e:
                 log_debug(f"Gemini TTS failed: {e}, falling back to gTTS")
         _speak_gtts(lang, text)
-        log_debug("TTS completed (gTTS)")
     except Exception as e:
         print(f"TTS error: {e}", file=sys.stderr)
 
@@ -594,7 +594,11 @@ def fetch_rss(source_config, limit=None):
     use_desc = args.use_description if args.use_description else source_config.get('use_description', False)
     src_filter = source_config.get('source_filter')
     # Expand comma-separated words and strip whitespace
-    all_block_words = BLOCK_WORDS + source_config.get('block_words', [])
+    bw = source_config.get('block_words', [])
+    if bw:
+        log_debug(f"\nblock: {bw}")
+
+    all_block_words = BLOCK_WORDS + bw
     block_words = []
     for word in all_block_words:
         if ',' in word:
@@ -604,9 +608,6 @@ def fetch_rss(source_config, limit=None):
     src_replace = [(re.compile(r['pattern']), r.get('replace', ''))
                     for r in source_config.get('replace', [])]
     replace_rules = REPLACE_RULES + src_replace
-    if block_words:
-        log_debug(f"{name} block: {', '.join(block_words)}")
-
     feed_items = root.xpath('//*[local-name()="item" or local-name()="entry"]')
     items = []
     for item in feed_items:
@@ -656,7 +657,7 @@ def fetch_rss(source_config, limit=None):
             except Exception as e:
                 log_debug(f"Failed to parse date '{dt_str}': {e}")
 
-    log_debug(f"{len(feed_items)} items {content_len} bytes {url}")
+    log_debug(f"\n{len(feed_items)} items {content_len} bytes {url}")
     return items
 
 

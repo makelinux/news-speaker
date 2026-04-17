@@ -1,6 +1,6 @@
-# mivzakim
+# news-speaker
 
-Hebrew news reader with TTS support.
+News reader with multi-engine text-to-speech.
 
 ## תקציר
 
@@ -16,41 +16,41 @@ backoff אוטומטי למקורות עם rate limiting
 
 **שימוש בסיסי:**
 ```bash
-./mivzakim.py           # הצג 10 חדשות אחרונות
-./mivzakim.py -p        # מצב ניטור רציף עם הקראה
-./mivzakim.py -s Ynet   # סנן לפי מקור
+./news-speaker.py           # הצג 10 חדשות אחרונות
+./news-speaker.py -p        # מצב ניטור רציף עם הקראה
+./news-speaker.py -s Ynet   # סנן לפי מקור
 ```
 
 ## Usage
 
 Normal mode - display latest news items:
 ```bash
-./mivzakim.py
+./news-speaker.py
 ```
 
 Polling mode - continuous monitoring with TTS and popup:
 ```bash
-./mivzakim.py -p
+./news-speaker.py -p
 ```
 
 Filter by source:
 ```bash
-./mivzakim.py -s Ynet
+./news-speaker.py -s Ynet
 ```
 
 Custom RSS URL or HTML page:
 ```bash
-./mivzakim.py -u https://example.com/feed
+./news-speaker.py -u https://example.com/feed
 ```
 
 Statistics - mean time between messages per source:
 ```bash
-./mivzakim.py --stat
+./news-speaker.py --stat
 ```
 
 Word frequency analysis:
 ```bash
-./mivzakim.py --word-freq
+./news-speaker.py --word-freq
 ```
 
 ## Options

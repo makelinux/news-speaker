@@ -50,6 +50,7 @@ settings:
     Pulcherrima, Rasalgethi, Sadachbia, Sadaltager,
     Schedar, Sulafat, Umbriel, Vindemiatrix, Zephyr,
     Zubenelgenubi]
+  tts_piper_model: ~/.local/share/piper-voices/en_US-lessac-medium.onnx
   replace:
     - pattern: '^\w+: '
     - pattern: '\s*\([^)]+\)\s*$'

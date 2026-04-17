@@ -58,7 +58,7 @@ def _deep_merge(base, override):
 
 def load_config(path=None):
     global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, TTS_VOICES, TTS_PIPER_MODEL, BLOCK_WORDS, REPLACE_RULES
-    global_path = os.path.expanduser('~/.config/news-reader/config.yaml')
+    global_path = os.path.expanduser('~/.config/news-speaker/config.yaml')
     local_path = path or os.path.join(os.path.dirname(__file__), 'config.yaml')
     config = _load_yaml(global_path)
     _deep_merge(config, _load_yaml(local_path))
@@ -388,7 +388,7 @@ def _play_audio(audio):
         pasimple.PA_SAMPLE_S16LE,
         audio.channels,
         audio.frame_rate,
-        app_name="news-app",
+        app_name="news-speaker",
         stream_name="playback",
     ) as pa:
         pa.write(audio.raw_data)

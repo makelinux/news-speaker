@@ -23,6 +23,9 @@ import yaml
 
 from hebrew_format import format_rtl_text
 
+DIM = "\033[90m"
+RST = "\033[0m"
+
 session = requests.Session()
 session.headers.update({
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0',
@@ -415,7 +418,7 @@ def _speak_gemini(text):
     audio = AudioSegment(data=data, sample_width=2, frame_rate=24000, channels=1)
     _play_audio(audio)
     status()
-    print(f"  {voice}", file=sys.stderr)
+    print(f"  {DIM}{voice}{RST}", file=sys.stderr)
 
 def _speak_gtts(lang, text):
     if lang == 'he':
@@ -836,14 +839,14 @@ def print_item(title, ts, src, desc='', use_desc=False):
         if desc and use_desc:
             wrapped = textwrap.fill(desc, width=WIDTH-38, initial_indent=8*' ', subsequent_indent=8*' ')
             print(f"\n{wrapped}")
-        print(8*' ' + f"{src}")
+        print(8*' ' + f"{DIM}{src}{RST}")
     else:
         print(textwrap.fill(line, width=w, subsequent_indent=8*' '))
 
         if desc and use_desc:
             wrapped = textwrap.fill(desc, width=WIDTH-38, initial_indent=8*' ', subsequent_indent=8*' ')
             print(f"\n{wrapped}")
-        print(f"{src.rjust(WIDTH-8)}")
+        print(f"{DIM}{src.rjust(WIDTH-8)}{RST}")
     sys.stdout.flush()
     if poll_mode and not args.no_tts and not is_microphone_active():
         text_to_speak = f"{title}. {desc}" if desc and use_desc else title

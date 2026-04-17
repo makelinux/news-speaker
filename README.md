@@ -2,25 +2,6 @@
 
 News reader with multi-engine text-to-speech.
 
-## תקציר
-
-קורא חדשות בעברית עם תמיכה בהקראה קולית.
-
-**תכונות עיקריות:**\
-קריאת RSS ממקורות מרובים (Ynet, maariv, Techmeme ועוד)\
-תצוגה מיושרת לעברית עם תוויות מקור\
-מצב polling עם התראות קוליות וחלון popup\
-סינון לפי מקור חדשות\
-זיהוי כפילויות לפי GUID\
-backoff אוטומטי למקורות עם rate limiting
-
-**שימוש בסיסי:**
-```bash
-./news-speaker.py           # הצג 10 חדשות אחרונות
-./news-speaker.py -p        # מצב ניטור רציף עם הקראה
-./news-speaker.py -s Ynet   # סנן לפי מקור
-```
-
 ## Usage
 
 Normal mode - display latest news items:
@@ -35,7 +16,7 @@ Polling mode - continuous monitoring with TTS and popup:
 
 Filter by source:
 ```bash
-./news-speaker.py -s Ynet
+./news-speaker.py -s techmeme
 ```
 
 Custom RSS URL or HTML page:
@@ -75,34 +56,13 @@ Word frequency analysis:
 - Popup window - shows new items on screen
 - GUID-based deduplication - handles edited headlines
 - HAR file support for bot-protected sources
-- Global + local config merge (~/.config/news-reader/ + local)
+- Global + local config merge (~/.config/news-speaker/ + local)
 - Per-source exponential backoff on 429/5xx/timeout errors
 - Network-aware backoff - skips penalty on general outages
 - Per-source `min_interval` config for rate-limited sources
 - Config hot-reload in polling mode
 - Block words filtering (global and per-source)
 - Inline status line during fetch and wait
-
-## Configuration
-
-`config.yaml` example:
-```yaml
-sources:
-  - name: Ynet
-    url: https://www.ynet.co.il/Integration/StoryRss1854.xml
-    block_words:
-      - some phrase
-  - name: HackerNoon AI
-    url: https://hackernoon.com/tagged/ai/feed
-    min_interval: 3600
-    enabled: true
-
-settings:
-  max_items: 10
-  poll_interval: 60
-  tts_volume_adjust: -10
-  block_words: []
-```
 
 ## Dependencies
 

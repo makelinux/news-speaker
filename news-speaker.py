@@ -206,10 +206,16 @@ def status(msg=''):
     else:
         print(f"\r\033[K", end='', flush=True, file=sys.stderr)
 
+LOG_FILE = os.path.join(os.path.dirname(__file__), 'errors.log')
+
+def log_error(msg):
+    print(msg, file=sys.stderr)
+    with open(LOG_FILE, 'a') as f:
+        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}\n")
+
 def log_debug(msg):
-    """Print debug message if debug mode enabled"""
     if args.debug:
-        print(f"{msg}", file=sys.stderr)
+        print(msg, file=sys.stderr)
 
 
 def list_html_links(url):
@@ -418,9 +424,7 @@ def _speak_gemini(text):
     )
     data = r.candidates[0].content.parts[0].inline_data.data
     audio = AudioSegment(data=data, sample_width=2, frame_rate=24000, channels=1)
-    _play_audio(audio)
-    status()
-    print(f"  {DIM}{voice}{RST}", file=sys.stderr)
+    return audio, voice
 
 def _speak_piper(text):
     model = os.path.expanduser(TTS_PIPER_MODEL)
@@ -431,10 +435,7 @@ def _speak_piper(text):
     )
     if r.returncode != 0:
         raise RuntimeError(r.stderr.decode().strip())
-    audio = AudioSegment(data=r.stdout, sample_width=2, frame_rate=22050, channels=1)
-    _play_audio(audio)
-    status()
-    log_debug("TTS completed (piper)")
+    return AudioSegment(data=r.stdout, sample_width=2, frame_rate=22050, channels=1)
 
 def _speak_gtts(lang, text):
     if lang == 'he':
@@ -446,28 +447,41 @@ def _speak_gtts(lang, text):
     buf.seek(0)
     audio = AudioSegment.from_mp3(buf)
     buf.close()
-    _play_audio(audio)
-    status()
-    log_debug("TTS completed (gTTS)")
+    return audio
 
 def speak_text(lang, text):
     try:
         log_debug(f"TTS: {text[:50]}... (lang: {lang})")
+        audio, voice = None, None
         if TTS_VOICES:
             try:
-                _speak_gemini(text)
-                return
+                audio, voice = _speak_gemini(text)
             except Exception as e:
                 log_debug(f"Gemini TTS failed: {e}")
-        if TTS_PIPER_MODEL and lang == 'en':
+        if not audio and TTS_PIPER_MODEL and lang == 'en':
             try:
-                _speak_piper(text)
-                return
+                audio = _speak_piper(text)
+                voice = 'piper'
             except Exception as e:
                 log_debug(f"Piper TTS failed: {e}")
-        _speak_gtts(lang, text)
+        if not audio:
+            audio = _speak_gtts(lang, text)
+            voice = 'gTTS'
+        was_playing = pause_media()
+        if was_playing:
+            time.sleep(0.5)
+            if is_media_playing():
+                log_debug("Media still playing after pause, skipping TTS")
+                return
+        time.sleep(1)
+        _play_audio(audio)
+        status()
+        print(f"  {DIM}{voice}{RST}", file=sys.stderr)
+        if was_playing:
+            time.sleep(0.5)
+            resume_media()
     except Exception as e:
-        print(f"TTS error: {e}", file=sys.stderr)
+        log_error(f"TTS error: {e}")
 
 
 def fetch_rss(source_config, limit=None):
@@ -525,7 +539,7 @@ def fetch_rss(source_config, limit=None):
             root = etree.fromstring(response.content, parser)
             break
         except requests.exceptions.HTTPError as e:
-            if response.status_code in (429,) or response.status_code >= 500:
+            if response.status_code in (403, 429) or response.status_code >= 500:
                 if url not in backoff:
                     backoff[url] = {'skip_until': 0, 'delay': BASE_DELAY}
                 backoff[url]['delay'] = min(backoff[url]['delay'] * 2, 86400)
@@ -534,7 +548,7 @@ def fetch_rss(source_config, limit=None):
                 d = backoff[url]['delay']
                 t = f"{d // 3600}h" if d >= 3600 else f"{d // 60}m" if d >= 60 else f"{d}s"
                 status()
-                print(f"{name}: {response.status_code} {response.reason}, backing off {t}", file=sys.stderr)
+                log_error(f"{name}: {response.status_code} {response.reason}, backing off {t}")
                 return []
             if attempt < 2:
                 log_debug(f"Attempt {attempt + 1} failed for {name}: {response.status_code}")
@@ -546,7 +560,7 @@ def fetch_rss(source_config, limit=None):
                     host = urlparse(url).hostname
                     msg += f", download HAR in browser, add to config: har: {host}.har"
                 status()
-                print(msg, file=sys.stderr)
+                log_error(msg)
                 return []
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
             reason = getattr(e.args[0], 'reason', e) if e.args else e
@@ -563,7 +577,7 @@ def fetch_rss(source_config, limit=None):
             d = backoff[url]['delay']
             t = f"{d // 3600}h" if d >= 3600 else f"{d // 60}m" if d >= 60 else f"{d}s"
             status()
-            print(f"{name}: {type(reason).__name__}, backing off {t}", file=sys.stderr)
+            log_error(f"{name}: {type(reason).__name__}, backing off {t}")
             return []
         except Exception as e:
             if attempt < 2:
@@ -571,7 +585,7 @@ def fetch_rss(source_config, limit=None):
                 time.sleep(1)
             else:
                 status()
-                print(f"{name}: {e}", file=sys.stderr)
+                log_error(f"{name}: {e}")
                 return []
 
     if root is None:
@@ -939,17 +953,6 @@ def show_news(news_items):
                 if not poll_mode and len(items) >= MAX_ITEMS:
                     break
 
-    # Pause media once before speaking all items
-    tts_items = poll_mode and not args.no_tts and items
-    was_playing = False
-    if tts_items and not is_microphone_active():
-        was_playing = pause_media()
-        if was_playing:
-            time.sleep(0.5)
-            if is_media_playing():
-                log_debug("Media still playing after pause, skipping TTS")
-                tts_items = False
-
     for item in items:
         title, ts, src = item[0], item[1], item[2]
         desc = item[3] if len(item) > 3 else ''
@@ -959,15 +962,9 @@ def show_news(news_items):
         print_item(title, ts, src, desc, use_desc)
         if poll_mode:
             time.sleep(1)
-        if poll_mode and not tts_items:
-            time.sleep(max(3, len(title) * 0.15))
         if poll_mode:
             time.sleep(1)
         hide_popup()
-
-    if was_playing:
-        time.sleep(0.5)
-        resume_media()
 
     first_poll = False
 

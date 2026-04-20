@@ -72,3 +72,4 @@ pip install lxml requests gtts pydub pasimple langdetect pyyaml screeninfo pytho
 
 Optional: `pip install google-genai` (Gemini TTS), `pip install piper-tts` (offline TTS)\
 System: playerctl (media pause/resume)
+# test

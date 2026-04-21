@@ -114,6 +114,8 @@ parser.add_argument('--word-freq', action='store_true',
                     help='Show word frequencies across all sources')
 parser.add_argument('--blocked', action='store_true',
                     help='Show only blocked/filtered items')
+parser.add_argument('-m', '--match', type=str,
+                    help='Show only items matching regex')
 parser.add_argument('--test-popup', action='store_true',
                     help='Show test popup window')
 args = parser.parse_args()
@@ -688,6 +690,8 @@ def fetch_rss(source_config, limit=None):
             text = f"{title_text} {desc}".lower()
             blocked = any(word in text for word in block_words)
             if args.blocked != blocked:
+                continue
+            if args.match and not re.search(args.match, text, re.IGNORECASE):
                 continue
 
             for pat, repl in replace_rules:

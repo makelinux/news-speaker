@@ -112,6 +112,8 @@ parser.add_argument('--no-tts', action='store_true',
                     help='Disable TTS')
 parser.add_argument('--word-freq', action='store_true',
                     help='Show word frequencies across all sources')
+parser.add_argument('--blocked', action='store_true',
+                    help='Show only blocked/filtered items')
 parser.add_argument('--test-popup', action='store_true',
                     help='Show test popup window')
 args = parser.parse_args()
@@ -211,7 +213,7 @@ LOG_FILE = os.path.join(os.path.dirname(__file__), 'errors.log')
 def log_error(msg):
     print(msg, file=sys.stderr)
     with open(LOG_FILE, 'a') as f:
-        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}\n")
+        f.write(f"{time.strftime('%y-%m-%d %H:%M:%S')} {msg}\n")
 
 def log_debug(msg):
     if args.debug:
@@ -684,7 +686,8 @@ def fetch_rss(source_config, limit=None):
 
             # Skip items with blocked words in title or description
             text = f"{title_text} {desc}".lower()
-            if any(word in text for word in block_words):
+            blocked = any(word in text for word in block_words)
+            if args.blocked != blocked:
                 continue
 
             for pat, repl in replace_rules:

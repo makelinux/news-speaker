@@ -57,7 +57,7 @@ def _deep_merge(base, override):
             base[k] = v
 
 def load_config(path=None):
-    global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, TTS_VOICES, TTS_PIPER_MODEL, BLOCK_WORDS, REPLACE_RULES
+    global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, TTS_VOICES, TTS_PIPER_MODEL, BLOCK_WORDS, REPLACE_RULES, QUIET_HOURS
     global_path = os.path.expanduser('~/.config/news-speaker/config.yaml')
     local_path = path or os.path.join(os.path.dirname(__file__), 'config.yaml')
     config = _load_yaml(global_path)
@@ -81,6 +81,7 @@ def load_config(path=None):
         BLOCK_WORDS = s.get('block_words', [])
     REPLACE_RULES = [(re.compile(r['pattern']), r.get('replace', ''))
                      for r in s.get('replace', [])]
+    QUIET_HOURS = s.get('quiet_hours', [{'from': 23, 'to': 7}])
 
 config = {}
 MAX_ITEMS = POLL_INTERVAL = TTS_VOLUME_ADJUST = 0
@@ -88,6 +89,7 @@ TTS_VOICES = []
 TTS_PIPER_MODEL = ''
 BLOCK_WORDS = []
 REPLACE_RULES = []
+QUIET_HOURS = [{'from': 23, 'to': 7}]
 # Parse arguments
 parser = argparse.ArgumentParser(description='Hebrew news reader')
 parser.add_argument('-p', '--poll', action='store_true',
@@ -182,14 +184,28 @@ def save_backoff():
     min_urls = {s['url'] for s in config.get('sources', []) if s.get('min_interval')}
     saved = {url: {'skip_until': s['skip_until'], 'delay': s['delay']}
              for url, s in backoff.items()
-             if s['delay'] > BASE_DELAY and url not in min_urls}
+             if url not in min_urls}
     try:
         with open(BACKOFF_FILE, 'w') as f:
             json.dump(saved, f)
+            f.write('\n')
     except OSError:
         pass
 
 load_backoff()
+
+def is_quiet_hours():
+    """Check if current time falls within any quiet hours interval"""
+    h = datetime.now().hour
+    for q in QUIET_HOURS:
+        a, b = q['from'], q['to']
+        if a > b:  # crosses midnight, e.g. 23-7
+            if h >= a or h < b:
+                return True
+        elif a <= h < b:
+            return True
+    return False
+
 net_ok = None  # None=untested, True/False per poll cycle
 
 def check_network():
@@ -891,7 +907,7 @@ def print_item(title, ts, src, desc='', use_desc=False):
             print(f"\n{wrapped}")
         print(f"{DIM}{src.rjust(WIDTH-8)}{RST}")
     sys.stdout.flush()
-    if poll_mode and not args.no_tts and not is_microphone_active():
+    if poll_mode and not args.no_tts and not is_microphone_active() and not is_quiet_hours():
         text_to_speak = f"{title}. {desc}" if desc and use_desc else title
         text_to_speak = text_to_speak.strip()
         if text_to_speak != last_spoken:
@@ -964,7 +980,7 @@ def show_news(news_items):
         title, ts, src = item[0], item[1], item[2]
         desc = item[3] if len(item) > 3 else ''
         use_desc = item[4] if len(item) > 4 else False
-        if poll_mode:
+        if poll_mode and not is_quiet_hours():
             show_popup([(title, ts, src)])
         print_item(title, ts, src, desc, use_desc)
         if poll_mode:

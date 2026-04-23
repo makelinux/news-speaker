@@ -159,7 +159,15 @@ seen = deque(maxlen=10000)
 first_poll = True
 last_spoken = None
 
-# Per-source backoff state: url -> {skip_until, delay}
+# Backoff: exponential delay per source to avoid being blocked.
+# Delay doubles on each error (403/429/5xx/timeout), caps at 24h.
+# Persisted to .backoff.json so delays survive restarts.
+# On load, skip_until is capped to now + delay to prevent
+# permanent blocking from stale timestamps.
+# On success, backoff is cleared (or reset to min_interval).
+# min_interval sources are not persisted - they're in config.
+# Network-down skips backoff only for new sources (no prior entry),
+# so accumulated delays are never lost.
 backoff = {}
 BACKOFF_FILE = os.path.join(os.path.dirname(__file__), '.backoff.json')
 BASE_DELAY = 60
@@ -172,6 +180,7 @@ def load_backoff():
         for url, s in saved.items():
             if isinstance(s, dict):
                 s['from_file'] = True
+                # Cap skip_until to prevent permanent blocking
                 s['skip_until'] = min(s['skip_until'], time.time() + s['delay'])
                 backoff[url] = s
             else:
@@ -180,7 +189,6 @@ def load_backoff():
         pass
 
 def save_backoff():
-    # Don't save min_interval entries - they're in config
     min_urls = {s['url'] for s in config.get('sources', []) if s.get('min_interval')}
     saved = {url: {'skip_until': s['skip_until'], 'delay': s['delay']}
              for url, s in backoff.items()
@@ -208,16 +216,16 @@ def is_quiet_hours():
 
 net_ok = None  # None=untested, True/False per poll cycle
 
-def check_network():
+def network_down():
     global net_ok
     if net_ok is not None:
-        return net_ok
+        return not net_ok
     try:
         session.head('https://www.google.com', timeout=5)
         net_ok = True
     except Exception:
         net_ok = False
-    return net_ok
+    return not net_ok
 
 def status(msg=''):
     """Show status on current line, wipe with empty call"""
@@ -559,6 +567,7 @@ def fetch_rss(source_config, limit=None):
             root = etree.fromstring(response.content, parser)
             break
         except requests.exceptions.HTTPError as e:
+            # 403/429/5xx: back off immediately, no retries
             if response.status_code in (403, 429) or response.status_code >= 500:
                 if url not in backoff:
                     backoff[url] = {'skip_until': 0, 'delay': BASE_DELAY}
@@ -570,6 +579,7 @@ def fetch_rss(source_config, limit=None):
                 status()
                 log_error(f"{name}: {response.status_code} {response.reason}, backing off {t}")
                 return []
+            # Other HTTP errors: retry up to 3 times
             if attempt < 2:
                 log_debug(f"Attempt {attempt + 1} failed for {name}: {response.status_code}")
                 time.sleep(1)
@@ -584,11 +594,11 @@ def fetch_rss(source_config, limit=None):
                 return []
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
             reason = getattr(e.args[0], 'reason', e) if e.args else e
-            if not check_network():
-                # General network failure, don't penalize this source
+            # Network down: skip backoff only if source has no prior entry,
+            # so accumulated delays are never accidentally reset
+            if network_down() and url not in backoff:
                 log_debug(f"{name}: network down, skipping backoff")
                 return []
-            # Source-specific failure, apply backoff
             if url not in backoff:
                 backoff[url] = {'skip_until': 0, 'delay': BASE_DELAY}
             backoff[url]['delay'] = min(backoff[url]['delay'] * 2, 86400)
@@ -611,7 +621,7 @@ def fetch_rss(source_config, limit=None):
     if root is None:
         return []
 
-    # Success after backoff
+    # Success: clear backoff (or reset to min_interval)
     if url in backoff:
         from_file = backoff[url].get('from_file')
         log_debug(f"{name}: success, backoff was {backoff[url]['delay']}s")

@@ -47,9 +47,21 @@ def _load_yaml(path):
             print(f"{path}: {e}", file=sys.stderr)
         return {}
 
+def _merge_sources(base, override):
+    """Merge sources by name - override updates matching entries"""
+    by_name = {s['name']: s for s in base}
+    for s in override:
+        n = s['name']
+        if n in by_name:
+            by_name[n].update(s)
+        else:
+            base.append(s)
+
 def _deep_merge(base, override):
     for k, v in override.items():
-        if k in base and isinstance(base[k], dict) and isinstance(v, dict):
+        if k == 'sources' and isinstance(base.get(k), list) and isinstance(v, list):
+            _merge_sources(base[k], v)
+        elif k in base and isinstance(base[k], dict) and isinstance(v, dict):
             _deep_merge(base[k], v)
         elif k in base and isinstance(base[k], list) and isinstance(v, list):
             base[k] = base[k] + v
@@ -60,8 +72,8 @@ def load_config(path=None):
     global config, MAX_ITEMS, POLL_INTERVAL, TTS_VOLUME_ADJUST, TTS_VOICES, TTS_PIPER_MODEL, BLOCK_WORDS, REPLACE_RULES, QUIET_HOURS
     global_path = os.path.expanduser('~/.config/news-speaker/config.yaml')
     local_path = path or os.path.join(os.path.dirname(__file__), 'config.yaml')
-    config = _load_yaml(global_path)
-    _deep_merge(config, _load_yaml(local_path))
+    config = _load_yaml(local_path)
+    _deep_merge(config, _load_yaml(global_path))
     s = config.get('settings', {})
     MAX_ITEMS = s.get('max_items', 10)
     POLL_INTERVAL = s.get('poll_interval', 60)

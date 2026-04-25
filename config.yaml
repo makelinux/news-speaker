@@ -5,6 +5,8 @@ sources:
     url: https://www.techmeme.com/feed.xml
   - name: The Register AI
     url: https://www.theregister.com/software/ai_ml/headlines.atom
+    block_words:
+      - Sponsored Feature
   - name: ai news
     url: https://www.artificialintelligence-news.com/feed/
   - name: the decoder

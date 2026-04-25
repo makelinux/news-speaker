@@ -20,6 +20,7 @@ sources:
     url: https://siliconangle.com/category/ai/feed
   - name: futurism ai
     url: https://futurism.com/categories/ai-artificial-intelligence/feed
+    min_interval: 3600
   - name: the new stack
     url: https://thenewstack.io/feed
   - name: nvidia

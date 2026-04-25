@@ -54,7 +54,7 @@ def _merge_sources(base, override):
         n = s['name']
         if n in by_name:
             by_name[n].update(s)
-        else:
+        elif 'url' in s:
             base.append(s)
 
 def _deep_merge(base, override):

@@ -43,7 +43,7 @@ sources:
 settings:
   max_items: 10
   poll_interval: 60
-  tts_volume_adjust: -10
+  tts_volume_adjust: -20
   tts_voices: [Achernar, Achird, Algenib, Algieba, Alnilam,
     Aoede, Autonoe, Callirrhoe, Charon, Despina,
     Enceladus, Erinome, Fenrir, Gacrux, Iapetus,

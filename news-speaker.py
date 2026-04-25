@@ -1014,6 +1014,10 @@ def show_news(news_items):
     first_poll = False
 
 
+HIDE_CURSOR = "\033[?25l"
+SHOW_CURSOR = "\033[?25h"
+print(HIDE_CURSOR, end='', flush=True, file=sys.stderr)
+
 try:
     # Check if URL is HTML (link listing mode)
     if args.url:
@@ -1133,4 +1137,5 @@ try:
         show_news(news)
 except KeyboardInterrupt:
     print("\nExiting...", file=sys.stderr)
-    sys.exit(0)
+finally:
+    print(SHOW_CURSOR, end='', flush=True, file=sys.stderr)

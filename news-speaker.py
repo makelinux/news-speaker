@@ -23,7 +23,15 @@ import yaml
 
 from rtl_format import format_rtl_text, is_rtl, RTL_LANGS
 
+def _is_light_bg():
+    v = os.environ.get('COLORFGBG', '')
+    if ';' in v:
+        return int(v.rsplit(';', 1)[1]) >= 8
+    return False
+
+# Watermark: very faint text for URLs
 DIM = "\033[90m"
+FAINT = "\033[37m" if _is_light_bg() else "\033[90m"
 RST = "\033[0m"
 
 session = requests.Session()
@@ -885,7 +893,7 @@ def hide_popup():
         popup_backend = None
 
 
-def print_item(title, ts, src, desc='', use_desc=False):
+def print_item(title, ts, src, desc='', use_desc=False, url=''):
     """Print news item and optionally speak"""
     global last_spoken
 
@@ -921,6 +929,8 @@ def print_item(title, ts, src, desc='', use_desc=False):
             wrapped = textwrap.fill(desc, width=WIDTH-38, initial_indent=8*' ', subsequent_indent=8*' ')
             print(f"\n{wrapped}")
         print(8*' ' + f"{DIM}{src}{RST}")
+        if url:
+            print(8*' ' + f"{FAINT}{url}{RST}")
     else:
         print(textwrap.fill(line, width=w, subsequent_indent=8*' '))
 
@@ -928,6 +938,8 @@ def print_item(title, ts, src, desc='', use_desc=False):
             wrapped = textwrap.fill(desc, width=WIDTH-38, initial_indent=8*' ', subsequent_indent=8*' ')
             print(f"\n{wrapped}")
         print(f"{DIM}{src.rjust(WIDTH-8)}{RST}")
+        if url:
+            print(f"{FAINT}{url.rjust(WIDTH-8)}{RST}")
     sys.stdout.flush()
     if poll_mode and not args.no_tts and not is_microphone_active() and not is_quiet_hours():
         text_to_speak = f"{title}. {desc}" if desc and use_desc else title
@@ -989,12 +1001,12 @@ def show_news(news_items):
         if poll_mode and first_poll:
             seen.append(key)
             if i == 0:
-                items.insert(0, (title_text, parse_time(dt_str), src, desc, use_desc))
+                items.insert(0, (title_text, parse_time(dt_str), src, desc, use_desc, key))
         else:
             # Normal mode or subsequent polls
             if key not in seen:
                 seen.append(key)
-                items.insert(0, (title_text, parse_time(dt_str), src, desc, use_desc))
+                items.insert(0, (title_text, parse_time(dt_str), src, desc, use_desc, key))
                 if not poll_mode and len(items) >= MAX_ITEMS:
                     break
 
@@ -1002,13 +1014,15 @@ def show_news(news_items):
         title, ts, src = item[0], item[1], item[2]
         desc = item[3] if len(item) > 3 else ''
         use_desc = item[4] if len(item) > 4 else False
+        url = item[5] if len(item) > 5 else ''
         if poll_mode and not is_quiet_hours():
             show_popup([(title, ts, src)])
-        print_item(title, ts, src, desc, use_desc)
+        print_item(title, ts, src, desc, use_desc, url)
         if poll_mode:
-            time.sleep(1)
-        if poll_mode:
-            time.sleep(1)
+            if is_media_playing() or is_quiet_hours():
+                time.sleep(max(3, len(title) * 0.15))
+            else:
+                time.sleep(2)
         hide_popup()
 
     first_poll = False

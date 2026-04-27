@@ -177,17 +177,19 @@ def _import_feeds(url):
             sources.append({'name': m.group(1), 'url': m.group(2)})
     return sources
 
-# Expand import sources
-expanded = []
-for s in enabled_sources:
-    if s['url'].endswith('.md'):
-        try:
-            expanded.extend(_import_feeds(s['url']))
-        except Exception as e:
-            log_error(f"import {s['url']}: {e}")
-    else:
-        expanded.append(s)
-enabled_sources = expanded
+def _expand_sources(sources):
+    expanded = []
+    for s in sources:
+        if s['url'].endswith('.md'):
+            try:
+                expanded.extend(_import_feeds(s['url']))
+            except Exception as e:
+                log_error(f"import {s['url']}: {e}")
+        else:
+            expanded.append(s)
+    return expanded
+
+enabled_sources = _expand_sources(enabled_sources)
 
 if args.debug:
     # Collect all block words: global + per-source
@@ -1180,7 +1182,7 @@ try:
         while True:
             load_config(args.config)
             if not args.url:
-                enabled_sources = [s for s in config.get('sources', []) if s.get('enabled', True)]
+                enabled_sources = _expand_sources([s for s in config.get('sources', []) if s.get('enabled', True)])
             news = fetch_news()
             if args.url and first_poll:
                 print_mean_time(news)

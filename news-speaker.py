@@ -694,6 +694,15 @@ def fetch_rss(source_config, limit=None):
             block_words.extend([w.strip().lower() for w in word.split(',')])
         else:
             block_words.append(word.lower())
+    only_words = []
+    ow = source_config.get('only', [])
+    if isinstance(ow, str):
+        ow = [ow]
+    for word in ow:
+        if ',' in word:
+            only_words.extend([w.strip().lower() for w in word.split(',')])
+        else:
+            only_words.append(word.lower())
     src_replace = [(re.compile(r['pattern']), r.get('replace', ''))
                     for r in source_config.get('replace', [])]
     replace_rules = REPLACE_RULES + src_replace
@@ -735,6 +744,13 @@ def fetch_rss(source_config, limit=None):
             # Skip items with blocked words in title or description
             text = f"{title_text} {desc}".lower()
             blocked = any(word in text for word in block_words)
+            if only_words:
+                matched = [w for w in only_words if w in text]
+                if matched:
+                    log_debug(f"only match: {matched} in: {title_text[:50]} | {desc[:50]}")
+                else:
+                    log_debug(f"only skip: {title_text[:50]}")
+                    blocked = True
             if args.blocked != blocked:
                 continue
             if args.match and not re.search(args.match, text, re.IGNORECASE):

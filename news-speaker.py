@@ -57,10 +57,10 @@ def _load_yaml(path):
 
 def _merge_sources(base, override):
     """Merge sources by name - override updates matching entries"""
-    by_name = {s['name']: s for s in base}
+    by_name = {s['name']: s for s in base if 'name' in s}
     for s in override:
-        n = s['name']
-        if n in by_name:
+        n = s.get('name')
+        if n and n in by_name:
             by_name[n].update(s)
         elif 'url' in s:
             base.append(s)
@@ -138,6 +138,9 @@ parser.add_argument('--blocked', action='store_true',
                     help='Show only blocked/filtered items')
 parser.add_argument('-m', '--match', type=str,
                     help='Show only items matching regex')
+parser.add_argument('--import-feeds', type=str, metavar='URL',
+                    nargs='?', const='https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds.yaml',
+                    help='Import RSS feeds from feeds.yaml URL (default: Olshansk/rss-feeds)')
 parser.add_argument('--test-popup', action='store_true',
                     help='Show test popup window')
 args = parser.parse_args()
@@ -161,8 +164,33 @@ if args.url:
 else:
     sources = config.get('sources', [])
     enabled_sources = [s for s in sources if s.get('enabled', True)]
+    if source_filter:
+        enabled_sources = [s for s in enabled_sources if source_filter.lower() in s.get('name', '').lower()]
     if not enabled_sources:
         enabled_sources = [{'url': 'https://rss.mivzakim.net/rss/category/1', 'name': 'Mivzakim', 'use_description': False}]
+
+def _import_feeds(url):
+    """Parse markdown table from URL, return list of source dicts"""
+    r = session.get(url, timeout=30)
+    r.raise_for_status()
+    sources = []
+    for line in r.text.splitlines():
+        m = re.match(r'\|\s*\[([^\]]+)\]\([^)]+\)\s*\|\s*\[[^\]]+\]\(([^)]+\.xml)\)', line)
+        if m:
+            sources.append({'name': m.group(1), 'url': m.group(2)})
+    return sources
+
+# Expand import sources
+expanded = []
+for s in enabled_sources:
+    if s['url'].endswith('.md'):
+        try:
+            expanded.extend(_import_feeds(s['url']))
+        except Exception as e:
+            log_error(f"import {s['url']}: {e}")
+    else:
+        expanded.append(s)
+enabled_sources = expanded
 
 if args.debug:
     # Collect all block words: global + per-source

@@ -1077,6 +1077,9 @@ SHOW_CURSOR = "\033[?25h"
 print(HIDE_CURSOR, end='', flush=True, file=sys.stderr)
 
 try:
+    if args.import_feeds:
+        enabled_sources = _import_feeds(args.import_feeds)
+
     # Check if URL is HTML (link listing mode)
     if args.url:
         if list_html_links(args.url):

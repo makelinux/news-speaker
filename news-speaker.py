@@ -1128,21 +1128,27 @@ try:
             print("No audio activity")
             sys.exit(1)
     elif args.stat:
-        print("source: duration items mean_interval")
+        rows = []
         for src in enabled_sources:
+            status(src.get('name', src['url']))
             items = fetch_rss(src, limit=999999)
             if len(items) < 2:
                 continue
-            duration = items[0][0] - items[-1][0]
+            duration = abs(items[0][0] - items[-1][0])
             mt = duration / (len(items) - 1)
-            dur_str = str(timedelta(seconds=int(duration.total_seconds())))
-            mt_str = str(timedelta(seconds=int(mt.total_seconds())))
-            if dur_str.startswith('0:'):
-                dur_str = dur_str[2:]
-            if mt_str.startswith('0:'):
-                mt_str = mt_str[2:]
+            dur_str = f"{duration.days}d"
+            s = int(mt.total_seconds())
+            mt_str = f"{s//3600}h" if s >= 3600 else f"{s//60}m" if s >= 60 else f"{s}s"
             name = src.get('name', src.get('url', 'Unknown'))
-            print(f"{name}: {dur_str} {len(items)} items {mt_str}")
+            rows.append((name, dur_str, str(len(items)), mt_str))
+        status()
+        if rows:
+            hdr = ('source', 'duration', 'items', 'interval')
+            w = [max(len(r[i]) for r in [hdr] + rows) for i in range(4)]
+            fmt = f"{{:<{w[0]}}}  {{:>{w[1]}}}  {{:>{w[2]}}}  {{:>{w[3]}}}"
+            print(fmt.format(*hdr))
+            for r in rows:
+                print(fmt.format(*r))
     elif args.test_popup:
         items = [
             ('הראשון השני השלישי', '12:34', 'test'),

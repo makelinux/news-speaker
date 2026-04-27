@@ -138,9 +138,6 @@ parser.add_argument('--blocked', action='store_true',
                     help='Show only blocked/filtered items')
 parser.add_argument('-m', '--match', type=str,
                     help='Show only items matching regex')
-parser.add_argument('--import-feeds', type=str, metavar='URL',
-                    nargs='?', const='https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds.yaml',
-                    help='Import RSS feeds from feeds.yaml URL (default: Olshansk/rss-feeds)')
 parser.add_argument('--test-popup', action='store_true',
                     help='Show test popup window')
 args = parser.parse_args()
@@ -1077,11 +1074,10 @@ SHOW_CURSOR = "\033[?25h"
 print(HIDE_CURSOR, end='', flush=True, file=sys.stderr)
 
 try:
-    if args.import_feeds:
-        enabled_sources = _import_feeds(args.import_feeds)
-
     # Check if URL is HTML (link listing mode)
-    if args.url:
+    if args.url and args.url.endswith('.md'):
+        enabled_sources = _import_feeds(args.url)
+    elif args.url:
         if list_html_links(args.url):
             sys.exit(0)
         # If not HTML, continue to treat as RSS

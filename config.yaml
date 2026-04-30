@@ -1,4 +1,6 @@
 sources:
+  - name: google
+    url: https://blog.google/rss/
   - url: https://raw.githubusercontent.com/Olshansk/rss-feeds/HEAD/README.md
   - name: axios
     url: https://api.axios.com/feed/

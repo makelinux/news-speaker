@@ -750,14 +750,16 @@ def fetch_rss(source_config, limit=None):
         description = item.find('description')
         if description is None:
             description = item.find('.//{http://www.w3.org/2005/Atom}summary')
-        guid = item.find('guid')
-        if guid is None:
-            guid = item.find('link')
-        if guid is None:
-            link = item.find('.//{http://www.w3.org/2005/Atom}link')
-            guid_text = link.get('href', '') if link is not None else ''
+        link = item.find('link')
+        atom_link = item.find('.//{http://www.w3.org/2005/Atom}link')
+        if link is not None and link.text:
+            link_url = link.text.strip()
+        elif atom_link is not None:
+            link_url = atom_link.get('href', '')
         else:
-            guid_text = guid.text.strip() if guid.text else ''
+            link_url = ''
+        guid = item.find('guid')
+        guid_text = guid.text.strip() if guid is not None and guid.text else link_url
         if title is not None and title.text and pubdate is not None and pubdate.text:
             title_text = title.text.strip()
             dt_str = pubdate.text.strip()
@@ -788,7 +790,7 @@ def fetch_rss(source_config, limit=None):
             try:
                 dt = parse_datetime(dt_str)
                 key = guid_text or title_text
-                items.append((dt, title_text, dt_str, src, desc, use_desc, key))
+                items.append((dt, title_text, dt_str, src, desc, use_desc, key, link_url))
             except Exception as e:
                 log_debug(f"Failed to parse date '{dt_str}': {e}")
 
@@ -1039,17 +1041,18 @@ def show_news(news_items):
         desc = item[4] if len(item) > 4 else ''
         use_desc = item[5] if len(item) > 5 else False
         key = item[6] if len(item) > 6 else title_text
+        url = item[7] if len(item) > 7 else ''
         if source_filter and source_filter not in src:
             continue
         if poll_mode and first_poll:
             seen.append(key)
             if i == 0:
-                items.insert(0, (title_text, parse_time(dt_str), src, desc, use_desc, key))
+                items.insert(0, (title_text, parse_time(dt_str), src, desc, use_desc, url))
         else:
             # Normal mode or subsequent polls
             if key not in seen:
                 seen.append(key)
-                items.insert(0, (title_text, parse_time(dt_str), src, desc, use_desc, key))
+                items.insert(0, (title_text, parse_time(dt_str), src, desc, use_desc, url))
                 if not poll_mode and len(items) >= MAX_ITEMS:
                     break
 

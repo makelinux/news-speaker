@@ -883,7 +883,7 @@ def _show_popup_tk(items, bg, fg):
     w = popup_window.winfo_reqwidth()
     h = popup_window.winfo_reqheight()
     sw = popup_window.winfo_screenwidth()
-    popup_window.geometry(f"{w}x{h}+{(sw - w) // 2}+10")
+    popup_window.geometry(f"{w}x{h}+{(sw - w) // 2}+0")
     popup_window.wait_visibility()
     popup_window.attributes('-alpha', 0.92)
     popup_window.update()
@@ -892,7 +892,8 @@ def _show_popup_gtk(items, bg, fg):
     global popup_window
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk
+    gi.require_version('Gdk', '3.0')
+    from gi.repository import Gtk, Gdk
 
     css = Gtk.CssProvider()
     css.load_from_data(f"window {{ background-color: {bg}; }} label {{ color: {fg}; }}".encode())
@@ -902,6 +903,8 @@ def _show_popup_gtk(items, bg, fg):
     popup_window.set_keep_above(True)
     popup_window.set_accept_focus(False)
     popup_window.set_focus_on_map(False)
+    popup_window.set_type_hint(Gdk.WindowTypeHint.NOTIFICATION)
+    popup_window.stick()
     popup_window.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -921,6 +924,9 @@ def _show_popup_gtk(items, bg, fg):
 
     popup_window.set_default_size(WIDTH * 8, -1)
     popup_window.show_all()
+    w, h = popup_window.get_size()
+    sw = Gdk.Screen.get_default().get_width()
+    popup_window.move((sw - w) // 2, 0)
     while Gtk.events_pending():
         Gtk.main_iteration()
 

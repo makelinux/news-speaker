@@ -161,8 +161,6 @@ if args.url:
 else:
     sources = config.get('sources', [])
     enabled_sources = [s for s in sources if s.get('enabled', True)]
-    if source_filter:
-        enabled_sources = [s for s in enabled_sources if source_filter.lower() in s.get('name', '').lower()]
     if not enabled_sources:
         enabled_sources = [{'url': 'https://rss.mivzakim.net/rss/category/1', 'name': 'Mivzakim', 'use_description': False}]
 
@@ -179,17 +177,29 @@ def _import_feeds(url):
 
 def _expand_sources(sources):
     expanded = []
+    overrides = [s for s in sources if 'url' not in s and 'name' in s]
     for s in sources:
+        if 'url' not in s:
+            continue
         if s['url'].endswith('.md'):
             try:
-                expanded.extend(_import_feeds(s['url']))
+                feeds = _import_feeds(s['url'])
+                extra = {k: v for k, v in s.items() if k != 'url'}
+                if extra:
+                    for f in feeds:
+                        f.update(extra)
+                expanded.extend(feeds)
             except Exception as e:
                 log_error(f"import {s['url']}: {e}")
         else:
             expanded.append(s)
+    if overrides:
+        _merge_sources(expanded, overrides)
     return expanded
 
 enabled_sources = _expand_sources(enabled_sources)
+if source_filter:
+    enabled_sources = [s for s in enabled_sources if source_filter.lower() in s.get('name', '').lower()]
 
 if args.debug:
     # Collect all block words: global + per-source
@@ -787,6 +797,8 @@ def fetch_rss(source_config, limit=None):
 
             for pat, repl in replace_rules:
                 title_text = pat.sub(repl, title_text)
+            if source_config.get('prepend_source'):
+                title_text = f"{configured_name}: {title_text}"
             try:
                 dt = parse_datetime(dt_str)
                 key = guid_text or title_text
@@ -1192,6 +1204,8 @@ try:
             load_config(args.config)
             if not args.url:
                 enabled_sources = _expand_sources([s for s in config.get('sources', []) if s.get('enabled', True)])
+                if source_filter:
+                    enabled_sources = [s for s in enabled_sources if source_filter.lower() in s.get('name', '').lower()]
             news = fetch_news()
             if args.url and first_poll:
                 print_mean_time(news)
